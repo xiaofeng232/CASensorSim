@@ -39,6 +39,8 @@ test/                    主机黄金测试（纯 C11，不依赖 Zephyr：make 
 
 - **tick**：TIM8 update @ 100 kHz（10 µs，KiCad 引脚分配表）；ISR 内
   `cas_step()` → `cas_fault_apply()` → GPIO 输出，主线程仅 LED 心跳。
+- **上电状态**：X1+ 预置（186 齿），const **0 rpm**（静止；转速由后续参数
+  接口给出），故障全关（FR-34）。
 - **数字输出**：PE0..PE7（24 V 高侧驱动前的 3.3 V 控制脚），`dig[]` 电平 +
   `oe[]` 使能（0 = 切输入高阻，FR-30/HR-02），8 路一次 BSRR 写入。
 - **SSI**：双通道字每 tick 已计算（含故障偏移/恒定/单帧/PFB/失效），引脚层

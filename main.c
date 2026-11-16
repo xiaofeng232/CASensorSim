@@ -150,14 +150,16 @@ int main(void)
 	}
 
 	cas_cfg_t cfg;
-	cas_profile_t prof = {.type = CAS_PROF_CONST, .rpm = 60.0};
+	/* Power-up state: engine stopped (const 0 rpm). The speed comes
+	 * from the runtime parameter interface once it exists. */
+	cas_profile_t prof = {.type = CAS_PROF_CONST, .rpm = 0.0};
 	cas_ssi_cfg_t ssi = {0};
 
 	cas_preset_x1plus(&cfg);
 	cas_fault_reset(&cas_faults); /* FR-34: all faults off at power-up */
 	cas_init(&cas_st, &cfg, &prof, &ssi, 1.0 / (double)CAS_TICK_HZ);
 
-	printk("CASensorSim: X1+ preset (186 teeth), const 60 rpm, "
+	printk("CASensorSim: X1+ preset (186 teeth), const 0 rpm, "
 	       "tick %u Hz, CH00..07 = PE0..7\n", CAS_TICK_HZ);
 
 	int rc = signal_path_start();
