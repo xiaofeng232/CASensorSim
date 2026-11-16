@@ -15,6 +15,10 @@
 
 #include "cas_core.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * X1+ test-rig CA Generator GUI preset (gui_config.py gui_to_spec on
  * configs/x1plus.json): REF1/REF2 pulse center 180.0 deg (width 1.0),
@@ -61,5 +65,9 @@ static inline void cas_preset_default100(cas_cfg_t *cfg)
 		.width_mdeg = {500, 600, 1800, 1800, 600, 1800, 1800, 500},
 	};
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CAS_PRESET_H */

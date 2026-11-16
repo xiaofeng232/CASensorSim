@@ -1,0 +1,53 @@
+version:  0.0.1
+ns:       cas
+summary:  CASensorSim telemetry and parameter interface
+
+# Interface published by the cas-sim firmware over the Fibre protocol
+# (USART1 on the FK407M2-ZGT6, see src/uart_backend.cpp). The host-side
+# verification script is host/cas_fibre_test.py; it reads the interface
+# JSON from endpoint 0, resolves these endpoints and exercises them over
+# the serial link.
+#
+# Telemetry attributes are refreshed by the 100 kHz signal ISR every tick
+# (see src/main.cpp). 32-bit aligned reads are atomic on Cortex-M; the
+# 64-bit sample_count may tear while being read (acceptable: monotonic).
+#
+# Fault trigger codes (`trigger` argument of set_dig_fault / set_ssi_fault,
+# values of cas_fault_trigger_t in cas/include/cas_fault.h):
+#   0 = immediate     active as soon as enable is set
+#   1 = at_angle      latch when the flywheel angle crosses angle_mdeg
+#   2 = every_n_rev   latch at every n-th revolution
+#   3 = every_n_ssi   latch at every n-th SSI frame
+#
+# set_rpm switches the speed profile to CONST at the given speed; the ramp
+# / fluct profiles stay compile-time for now. set_ssi_fault sets the full
+# cas_ssi_fault_t effect set (combinable while the trigger is active);
+# clear_faults returns to the all-off power-up state (FR-34).
+#
+# Legacy protocol type notes (fibre01 endpoint table): function arguments
+# and return values only support the fixed-size int/uint types -- bool is
+# expressed as uint8 (0/1) and set_rpm takes the speed in milli-rpm
+# (int32, 60000 = 60.000 rpm, negative = reverse). Telemetry attributes
+# are properties, where float32/int32/uint64 work natively.
+interfaces:
+  CasIntf:
+    c_is_class: True
+    brief: Toplevel interface of the CA sensor signal simulator.
+    attributes:
+      firmware_version: readonly uint32
+      tick_hz: readonly uint32
+      rpm: readonly float32
+      theta_deg: readonly float32
+      dig_mask: readonly uint8
+      oe_mask: readonly uint8
+      ssi1: readonly int32
+      ssi2: readonly int32
+      sample_count: readonly uint64
+    functions:
+      set_rpm: {in: {rpm_mrpm: int32}, out: {ok: uint8}}
+      set_dig_fault: {in: {channel: uint8, enable: uint8, trigger: uint8, angle_mdeg: uint32, every_n: uint32}, out: {ok: uint8}}
+      set_ssi_fault: {in: {channel: uint8, enable: uint8, trigger: uint8, angle_mdeg: uint32, every_n: uint32, pfb: uint8, offset_mdeg: int32, hold: uint8, single_frame_delta: int32, fail: uint8}, out: {ok: uint8}}
+      clear_faults: {}
+
+exports:
+  cas_object: CasIntf
