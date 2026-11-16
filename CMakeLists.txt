@@ -18,11 +18,12 @@ cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(cas_sensor_sim LANGUAGES C)
 
+# include/ holds the public core headers; src/ the implementation.
 target_include_directories(app PRIVATE include)
 
 target_sources(app PRIVATE
     src/main.c
-    # Bit-exact casim port (virtual CA core). Public headers in include/,
-    # host-tested with test/test_golden.c; timer + GPIO wiring later.
-    src/cas/cas_core.c
+    # Bit-exact casim port (virtual CA core), host-tested with
+    # test/test_golden.c; timer + GPIO wiring is a later step.
+    src/cas_core.c
 )

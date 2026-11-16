@@ -22,8 +22,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "cas/cas_core.h"
-#include "cas/cas_preset.h"
+#include "cas_core.h"
+#include "cas_preset.h"
 
 static int failures;
 
