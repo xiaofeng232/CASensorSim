@@ -1,0 +1,7 @@
+# Generated simulation outputs (regenerate with: python -m casim ...)
+out/
+__pycache__/
+*.pyc
+
+# Zephyr build directory
+build/

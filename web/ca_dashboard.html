@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CA 传感器信号仿真 — 单页面</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --panel:#ffffff; --line:#d9dee5; --ink:#1c2733; --mut:#66707c;
+    --acc:#0b5fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:13px/1.45 "Segoe UI","Microsoft YaHei",sans-serif}
+  header{background:#10233c;color:#fff;padding:10px 16px;display:flex;
+         align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0}
+  header .sub{color:#9fb3cc;font-size:12px}
+  main{display:flex;gap:10px;padding:10px;align-items:flex-start}
+  .left{width:430px;min-width:430px;display:flex;flex-direction:column;gap:10px}
+  .right{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+         padding:10px 12px}
+  .panel h2{font-size:13px;margin:0 0 8px;color:#0f3a6d;
+            border-left:3px solid var(--acc);padding-left:8px}
+  fieldset{border:1px solid var(--line);border-radius:6px;margin:0 0 8px;padding:6px 8px 8px}
+  legend{font-size:12px;color:var(--mut);padding:0 4px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 10px}
+  .f{display:flex;align-items:center;gap:6px}
+  .f label{flex:1;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .f input[type=number]{width:82px;padding:2px 4px;border:1px solid var(--line);
+       border-radius:4px;font:12px Consolas,monospace;text-align:right}
+  .f select{width:100%;padding:2px;border:1px solid var(--line);border-radius:4px}
+  .f .unit{color:#9aa4af;font-size:11px;width:30px}
+  button{background:var(--acc);color:#fff;border:0;border-radius:5px;padding:5px 10px;
+         font-size:12px;cursor:pointer}
+  button.ghost{background:#e8eef7;color:#0f3a6d}
+  button:disabled{opacity:.45;cursor:default}
+  .btnrow{display:flex;gap:8px;align-items:center;margin:6px 0 2px;flex-wrap:wrap}
+  table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid var(--line);padding:2px 6px;font:12px Consolas,monospace}
+  th{background:#f4f7fb;color:var(--mut);font-weight:normal;text-align:left}
+  .chip{display:inline-block;border:1.5px solid;border-radius:4px;padding:1px 6px;
+        font:11px Consolas,monospace;margin:1px 2px;background:#fff;color:var(--mut)}
+  .chip.on{color:#fff}
+  .chip.z{border-style:dashed;background:#eef0f3!important;color:#8892a0!important}
+  canvas{display:block;max-width:100%}
+  #waveDig,#waveCA{width:100%}
+  #status{font:11px Consolas,monospace;color:var(--mut);margin-top:6px;min-height:14px}
+  #status.warn{color:#b45309}
+  .legendrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .foot{color:var(--mut);font-size:11px;padding:2px 4px 12px}
+  .chk{display:inline-flex;align-items:center;gap:4px;color:var(--mut);margin-right:10px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>曲轴角度 (CA) 传感器信号仿真</h1>
+  <span class="sub">casim 黄金模型同公式 · 单飞轮单齿轮 · 8 路拾波（NI 9474 接线）· TDC1/TDC2 冗余 · 纯前端单文件</span>
+</header>
+<main>
+  <!-- ============ 左侧：参数 + 虚拟飞轮/传感器安装 ============ -->
+  <section class="left">
+    <div class="panel">
+      <h2>参数</h2>
+      <fieldset>
+        <legend>飞轮齿轮（单齿轮，A/B/C/D 共用）</legend>
+        <div class="grid">
+          <div class="f"><label>齿数 teeth</label><input type="number" id="teeth" step="1" min="2" max="360"></div>
+          <div class="f"><label>第 0 齿 tooth0</label><input type="number" id="tooth0" step="1" min="0" max="360000"><span class="unit">mDeg</span></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>飞轮标记</legend>
+        <div class="grid3">
+          <div class="f"><label>REF1</label><input type="number" id="ref1_mark" step="1" min="0" max="360000"><span class="unit">mDeg</span></div>
+          <div class="f"><label>REF2</label><input type="number" id="ref2_mark" step="1" min="0" max="360000"><span class="unit">mDeg</span></div>
+          <div class="f"><label>TDC</label><input type="number" id="tdc_mark" step="1" min="0" max="360000"><span class="unit">mDeg</span></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>传感器安装角（发动机坐标系, 0 = TDC, 单位 mDeg）</legend>
+        <div class="grid">
+          <div class="f"><label>pos_a (CH02)</label><input type="number" id="pos_a" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_b (CH03)</label><input type="number" id="pos_b" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_ref1 (CH01)</label><input type="number" id="pos_ref1" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_c (CH05)</label><input type="number" id="pos_c" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_d (CH06)</label><input type="number" id="pos_d" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_ref2 (CH04)</label><input type="number" id="pos_ref2" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_tdc1 (CH00)</label><input type="number" id="pos_tdc1" step="1" min="0" max="360000"></div>
+          <div class="f"><label>pos_tdc2 (CH07)</label><input type="number" id="pos_tdc2" step="1" min="0" max="360000"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>脉冲宽度（高电平, mDeg）</legend>
+        <div class="grid">
+          <div class="f"><label>a_width</label><input type="number" id="a_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>b_width</label><input type="number" id="b_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>c_width</label><input type="number" id="c_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>d_width</label><input type="number" id="d_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>ref1_width</label><input type="number" id="ref1_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>ref2_width</label><input type="number" id="ref2_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>tdc1_width</label><input type="number" id="tdc1_width" step="1" min="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>tdc2_width</label><input type="number" id="tdc2_width" step="1" min="1"><span class="unit">mDeg</span></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>转速曲线（虚拟飞轮输入）</legend>
+        <div class="grid">
+          <div class="f"><label>类型</label>
+            <select id="profType">
+              <option value="const">常数</option>
+              <option value="ramp">斜坡（加/减速）</option>
+              <option value="fluct">波动（基线 + 正弦）</option>
+            </select>
+          </div>
+          <div class="f" id="rowRpm"><label id="lblRpm">目标/基线 rpm</label><input type="number" id="rpm" step="1"><span class="unit">rpm</span></div>
+          <div class="f" id="rowStart"><label>起始 start_rpm</label><input type="number" id="startRpm" step="1"><span class="unit">rpm</span></div>
+          <div class="f" id="rowTarget"><label>目标 target_rpm</label><input type="number" id="targetRpm" step="1"><span class="unit">rpm</span></div>
+          <div class="f" id="rowAccel"><label>加速度 accel</label><input type="number" id="accel" step="1"><span class="unit">rpm/s</span></div>
+          <div class="f" id="rowAmp"><label>波动幅值 amp</label><input type="number" id="amp" step="0.5"><span class="unit">rpm</span></div>
+          <div class="f" id="rowFreq"><label>波动频率 freq</label><input type="number" id="freq" step="0.1"><span class="unit">Hz</span></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>仿真 / SSI</legend>
+        <div class="grid">
+          <div class="f"><label>时长 duration</label><input type="number" id="duration" step="0.5" min="0.1"><span class="unit">s</span></div>
+          <div class="f"><label>采样 dt</label><input type="number" id="dtus" step="1" min="0.1"><span class="unit">µs</span></div>
+          <div class="f"><label>起始角 θ₀</label><input type="number" id="startAngle" step="1"><span class="unit">mDeg</span></div>
+          <div class="f"><label>SSI2 偏移</label><input type="number" id="ssi2off" step="1"><span class="unit">mDeg</span></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>故障注入（默认全关 · 显式使能 FR-34 · 角度 mDeg · OFF = 高阻）</legend>
+        <div class="grid">
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz0">CH00 TDC1 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz1">CH01 REF1 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz2">CH02 A 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz3">CH03 B 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz4">CH04 REF2 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz5">CH05 C 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz6">CH06 D 断线</label></div>
+          <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="fz7">CH07 TDC2 断线</label></div>
+          <div class="f" style="grid-column:1/-1">
+            <label class="chk" style="margin:0;flex:none"><input type="checkbox" id="fzGrp">两组 CA 差值 Δ（组 2：REF2/C/D/TDC2 平移）</label>
+            <input type="number" id="fzGrpDelta" step="1" value="0"><span class="unit">mDeg</span>
+          </div>
+          <div class="f" style="grid-column:1/-1">
+            <label class="chk" style="margin:0"><input type="checkbox" id="pfb1">PFB1（SSI1 故障位）</label>
+            <label class="chk" style="margin:0"><input type="checkbox" id="pfb2">PFB2（SSI2 故障位）</label>
+          </div>
+          <div class="f" style="grid-column:1/-1">
+            <label class="chk" style="margin:0;flex:none"><input type="checkbox" id="ssi1_hold">SSI1 角度恒定</label>
+            <input type="number" id="ssi1_hold_ang" step="1" min="0" max="360000" value="180000"><span class="unit">mDeg</span>
+          </div>
+          <div class="f" style="grid-column:1/-1">
+            <label class="chk" style="margin:0;flex:none"><input type="checkbox" id="ssi2_hold">SSI2 角度恒定</label>
+            <input type="number" id="ssi2_hold_ang" step="1" min="0" max="360000" value="180000"><span class="unit">mDeg</span>
+          </div>
+          <div class="f" style="grid-column:1/-1">
+            <label class="chk" style="margin:0"><input type="checkbox" id="ssi1_fail">SSI1 总失效（高阻）</label>
+            <label class="chk" style="margin:0"><input type="checkbox" id="ssi2_fail">SSI2 总失效（高阻）</label>
+          </div>
+        </div>
+      </fieldset>
+      <div class="btnrow">
+        <button class="ghost" id="btnDefault">默认 100 齿</button>
+        <button class="ghost" id="btnX1">X1+ 实机 186 齿</button>
+        <button id="btnRun">▶ 运行</button>
+        <button class="ghost" id="btnPause" disabled>⏸ 暂停</button>
+        <button class="ghost" id="btnStop" disabled>⏹ 停止</button>
+        <label class="chk">时标
+          <select id="timeScale" style="width:64px;padding:2px;border:1px solid var(--line);border-radius:4px">
+            <option value="1">1×</option><option value="0.25">0.25×</option><option value="0.05">0.05×</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" id="chkLoop"> 循环</label>
+      </div>
+      <h2 style="margin-top:10px">派生参数（自动计算）</h2>
+      <table id="derived"></table>
+      <div id="status"></div>
+    </div>
+    <div class="panel">
+      <h2>虚拟飞轮 · 传感器安装位置</h2>
+      <canvas id="flywheel" width="440" height="440"></canvas>
+      <div class="legendrow" id="legend"></div>
+    </div>
+  </section>
+
+  <!-- ============ 右侧：数据 ============ -->
+  <section class="right">
+    <div class="panel">
+      <h2>传感器信号（CH00–CH07，NI 9474 接线）</h2>
+      <canvas id="waveDig" width="980" height="440"></canvas>
+    </div>
+    <div class="panel">
+      <h2>CA 信号（曲轴角 θ 0–360000 mDeg / 转速 / SSI）</h2>
+      <canvas id="waveCA" width="980" height="240"></canvas>
+      <div class="btnrow">
+        <label class="chk"><input type="checkbox" id="chkSsi" checked> SSI1 角度 (0–360°)</label>
+        <label class="chk"><input type="checkbox" id="chkRpm" checked> 转速 rpm</label>
+        <button id="btnCsv" style="margin-left:auto">导出 CSV（casim 格式）</button>
+        <span id="csvInfo" style="color:var(--mut);font-size:11px"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>实时数据</h2>
+      <table>
+        <tr><th>t [s]</th><td id="lvT">–</td><th>θ [mDeg]</th><td id="lvA">–</td>
+            <th>rpm</th><td id="lvR">–</td></tr>
+        <tr><th>SSI1 [count]</th><td id="lvS1">–</td><th>SSI2 [count]</th><td id="lvS2">–</td>
+            <th>PFB</th><td id="lvP">–</td></tr>
+      </table>
+      <div id="chips" style="margin-top:6px"></div>
+    </div>
+  </section>
+</main>
+<div class="foot">
+  所有角度参数单位为 <b>mDeg</b>（1/1000°，0–360000，与 X1+ GUI 一致），内部换算 deg 计算。
+  公式与 <b>casim</b> 黄金模型一致：方波 rel=(θ−center+L/2) mod P → (rel&lt;L)；
+  梯形积分 θ[k+1]=θ[k]+0.5·(rpm[k]+rpm[k+1])·6·dt；SSI = round(θ/360×4096) mod 4096（banker's rounding），bit12 = PFB；
+  脉冲中心：齿拾波 (pos−tooth0) mod (360/teeth)，标记 (pos−mark) mod 360（TDC1/TDC2 同读 1 个 TDC 标记）。
+  <b>动态运行/停止</b>：运行中按同一公式逐 dt 实时推进（滚动示波窗口 1 s），
+  可随时设定转速（常数/斜坡/波动，修改即时生效）；停止后回到按参数预计算的静态预览与 CSV 数据。
+  曲轴角 θ 按 <b>0–360000 mDeg</b>（1/1000 度）每转回绕显示，与 ECU 角度计数一致；波形画布随卡片宽度铺满。
+  <b>故障注入</b>（FR-30/31）：通道断线（OFF = 高阻）、两组 CA 差值（组 2 CH04–CH07 平移 Δ mDeg）、
+  SSI PFB / 角度恒定 / 总失效（高阻，覆盖恒定）；默认全关、显式使能（FR-34），全部关闭时与黄金模型<b>位级一致</b>。
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const COL = {A:'#1f77b4',B:'#2ca02c',REF1:'#d62728',C:'#ff7f0e',D:'#8c564b',
+             REF2:'#17becf',TDC1:'#9467bd',TDC2:'#e377c2'};
+// NI 9474 接线: CH00 TDC1, CH01 REF1, CH02 A, CH03 B, CH04 REF2, CH05 C, CH06 D, CH07 TDC2
+const CHANS = [['CH00','TDC1'],['CH01','REF1'],['CH02','A'],['CH03','B'],
+               ['CH04','REF2'],['CH05','C'],['CH06','D'],['CH07','TDC2']];
+// 组 2（"两组 CA 差值"故障平移对象）：CH04 REF2, CH05 C, CH06 D, CH07 TDC2
+const GRP2 = new Set(['REF2','C','D','TDC2']);
+const POSKEY = {A:'pos_a',B:'pos_b',REF1:'pos_ref1',C:'pos_c',D:'pos_d',
+                REF2:'pos_ref2',TDC1:'pos_tdc1',TDC2:'pos_tdc2'};
+const WKEY   = {A:'a_width',B:'b_width',REF1:'ref1_width',C:'c_width',D:'d_width',
+                REF2:'ref2_width',TDC1:'tdc1_width',TDC2:'tdc2_width'};
+
+// 角度参数单位: mDeg（1/1000°，0–360000，与 X1+ GUI 一致）
+const PRESETS = {
+  default: {teeth:100,tooth0:0,ref1_mark:0,ref2_mark:0,tdc_mark:0,
+    pos_a:900,pos_b:2700,pos_ref1:0,pos_c:900,pos_d:2700,pos_ref2:0,pos_tdc1:0,pos_tdc2:0,
+    a_width:1800,b_width:1800,c_width:1800,d_width:1800,ref1_width:600,ref2_width:600,
+    tdc1_width:500,tdc2_width:500,
+    prof:'const',rpm:60,startRpm:0,targetRpm:60,accel:10,amp:0,freq:1,
+    duration:5,dtus:50,startAngle:0,ssi2off:0,
+    fz0:false,fz1:false,fz2:false,fz3:false,fz4:false,fz5:false,fz6:false,fz7:false,
+    fzGrp:false,fzGrpDelta:0,pfb1:false,pfb2:false,
+    ssi1_hold:false,ssi1_hold_ang:180000,ssi2_hold:false,ssi2_hold_ang:180000,
+    ssi1_fail:false,ssi2_fail:false},
+  x1plus: {teeth:186,tooth0:0,ref1_mark:0,ref2_mark:0,tdc_mark:0,
+    pos_a:180000,pos_b:180300,pos_ref1:180000,pos_c:180000,pos_d:180300,pos_ref2:180000,
+    pos_tdc1:200,pos_tdc2:200,
+    a_width:600,b_width:600,c_width:600,d_width:600,ref1_width:1000,ref2_width:1000,
+    tdc1_width:1000,tdc2_width:1000,
+    prof:'const',rpm:60,startRpm:0,targetRpm:60,accel:10,amp:0,freq:1,
+    duration:5,dtus:20,startAngle:0,ssi2off:0,
+    fz0:false,fz1:false,fz2:false,fz3:false,fz4:false,fz5:false,fz6:false,fz7:false,
+    fzGrp:false,fzGrpDelta:0,pfb1:false,pfb2:false,
+    ssi1_hold:false,ssi1_hold_ang:180000,ssi2_hold:false,ssi2_hold_ang:180000,
+    ssi1_fail:false,ssi2_fail:false}
+};
+
+/* ---------------- 参数读取 ---------------- */
+function num(id,def){ const v=parseFloat($(id).value); return isFinite(v)?v:def; }
+function intv(id,def){ const v=parseInt($(id).value,10); return isFinite(v)?v:def; }
+function readParams(){
+  // 角度参数界面单位为 mDeg（0–360000），此处 ÷1000 换算为 deg 参与计算
+  const p = {
+    teeth:intv('teeth',100), tooth0:num('tooth0')/1000,
+    ref1_mark:num('ref1_mark')/1000, ref2_mark:num('ref2_mark')/1000, tdc_mark:num('tdc_mark')/1000,
+    pos_a:num('pos_a')/1000,pos_b:num('pos_b')/1000,pos_ref1:num('pos_ref1')/1000,
+    pos_c:num('pos_c')/1000,pos_d:num('pos_d')/1000,pos_ref2:num('pos_ref2')/1000,
+    pos_tdc1:num('pos_tdc1')/1000,pos_tdc2:num('pos_tdc2')/1000,
+    a_width:num('a_width')/1000,b_width:num('b_width')/1000,c_width:num('c_width')/1000,d_width:num('d_width')/1000,
+    ref1_width:num('ref1_width')/1000,ref2_width:num('ref2_width')/1000,
+    tdc1_width:num('tdc1_width')/1000,tdc2_width:num('tdc2_width')/1000,
+    prof:$('profType').value,
+    rpm:num('rpm'),startRpm:num('startRpm'),targetRpm:num('targetRpm'),
+    accel:num('accel'),amp:num('amp'),freq:num('freq'),
+    duration:num('duration'),dtus:num('dtus'),startAngle:num('startAngle')/1000,
+    ssi2off:num('ssi2off')/1000
+    // 注: PFB / 断线 / 两组差值 / SSI 恒定/失效等故障参数由 readFaults() 单独读取
+  };
+  p.ssi1off = 0;
+  if(!(p.teeth>=2 && p.teeth<=360)) return {error:`齿数须为 2..360（当前 ${p.teeth}）`};
+  if(!(p.dtus>=0.1 && p.dtus<=1000)) return {error:`dt 须为 0.1..1000 µs`};
+  if(!(p.duration>=0.1 && p.duration<=300)) return {error:`时长须为 0.1..300 s`};
+  const wmin = Math.min(p.a_width,p.b_width,p.c_width,p.d_width,
+                        p.ref1_width,p.ref2_width,p.tdc1_width,p.tdc2_width);
+  if(wmin<=0) return {error:`脉冲宽度须 > 0`};
+  return {p};
+}
+
+/* ---------------- 故障注入读取（FR-30/31/34：默认全关，显式使能才注入） ---------------- */
+function readFaults(){
+  const f={
+    z:[0,1,2,3,4,5,6,7].map(i=>$('fz'+i).checked),          // 断线: OFF = 高阻
+    grp:$('fzGrp').checked, grpDelta:num('fzGrpDelta',0),   // 两组 CA 差值 Δ [mDeg, 可负]
+    pfb1:$('pfb1').checked, pfb2:$('pfb2').checked,         // SSI 故障位
+    ssi1hold:$('ssi1_hold').checked, ssi1holdAng:num('ssi1_hold_ang',180000)/1000,
+    ssi2hold:$('ssi2_hold').checked, ssi2holdAng:num('ssi2_hold_ang',180000)/1000,
+    ssi1fail:$('ssi1_fail').checked, ssi2fail:$('ssi2_fail').checked   // 总失效（高阻，覆盖恒定）
+  };
+  f.any=f.z.some(Boolean)||f.grp||f.pfb1||f.pfb2||f.ssi1hold||f.ssi2hold||f.ssi1fail||f.ssi2fail;
+  return f;
+}
+// SSI 角度恒定读字：与实时 SSI 同一计数公式（banker's rounding，无偏移）
+function sseHold(aDeg){ return roundHalfEven(mod(aDeg,360.0)/360.0*4096.0)%4096; }
+function faultList(f){
+  const parts=[];
+  const zc=[];f.z.forEach((z,k)=>{if(z)zc.push(CHANS[k][0]);});
+  if(zc.length)parts.push(`断线 ${zc.join('/')}`);
+  if(f.grp)parts.push(`两组 CA 差 Δ=${f.grpDelta} mDeg（组 2 平移）`);
+  if(f.pfb1)parts.push('PFB1');
+  if(f.pfb2)parts.push('PFB2');
+  if(f.ssi1hold)parts.push(`SSI1 恒定 ${Math.round(f.ssi1holdAng*1000).toLocaleString()} mDeg`);
+  if(f.ssi2hold)parts.push(`SSI2 恒定 ${Math.round(f.ssi2holdAng*1000).toLocaleString()} mDeg`);
+  if(f.ssi1fail)parts.push('SSI1 总失效（高阻）');
+  if(f.ssi2fail)parts.push('SSI2 总失效（高阻）');
+  return parts.join('；');
+}
+function maxAbsRpm(p){
+  if(p.prof==='const') return Math.abs(p.rpm);
+  if(p.prof==='ramp')  return Math.max(Math.abs(p.startRpm),Math.abs(p.targetRpm));
+  return Math.abs(p.rpm)+Math.abs(p.amp);
+}
+function applyPreset(k){
+  const q=PRESETS[k];
+  for(const key in q){
+    const el=$(key);
+    if(!el) continue;
+    if(el.type==='checkbox') el.checked=q[key];
+    else if(key==='prof') el.value=q[key];
+    else el.value=q[key];
+  }
+  showProfileRows(q.prof);
+  recompute();
+}
+
+/* ---------------- 信号生成（与 casim 同公式） ---------------- */
+function mod(x,m){ x%=m; if(x<0)x+=m; return x; }
+// numpy 风格四舍六入五成双（np.round）
+function roundHalfEven(x){
+  const f=Math.floor(x);
+  if(x-f===0.5) return (f%2===0)? f : f+1;
+  return Math.round(x);
+}
+function profileRpm(t,p){
+  if(p.prof==='const') return p.rpm;
+  if(p.prof==='ramp'){
+    const v=p.startRpm+p.accel*t;
+    return Math.min(Math.max(v,Math.min(p.startRpm,p.targetRpm)),
+                    Math.max(p.startRpm,p.targetRpm));
+  }
+  return p.rpm+p.amp*Math.sin(2*Math.PI*p.freq*t);
+}
+const MAX_SAMPLES = 4000000;
+
+function simulate(p,f){
+  let N = Math.round(p.duration/(p.dtus*1e-6))+1;
+  let capped=false;
+  if(N>MAX_SAMPLES){ N=MAX_SAMPLES; capped=true; }
+  const dt=p.dtus*1e-6;
+  const t=new Float64Array(N), rpm=new Float64Array(N), angle=new Float64Array(N);
+  for(let i=0;i<N;i++){ const tt=i*dt; t[i]=tt; rpm[i]=profileRpm(tt,p); }
+  angle[0]=p.startAngle;
+  for(let k=1;k<N;k++) angle[k]=angle[k-1]+0.5*(rpm[k]+rpm[k-1])*6.0*dt;
+
+  const P=360.0/p.teeth;
+  const centers={};
+  for(const [ch,name] of CHANS){
+    const period=(name==='REF1'||name==='REF2'||name==='TDC1'||name==='TDC2')?360.0:P;
+    const mark=(name==='REF1')?p.ref1_mark:(name==='REF2')?p.ref2_mark:
+               (name==='TDC1'||name==='TDC2')?p.tdc_mark:p.tooth0;
+    centers[name]=mod(p[POSKEY[name]]-mark,period);
+  }
+  // 两组 CA 差值故障：使能后组 2（CH04–CH07）中心平移 Δ（mod 周期），
+  // 组 1 不变 → 两拾波组各自估算的 CA 相差 Δ。未使能时 centers 完全不变（位级一致）。
+  if(f.grp){
+    const dD=mod(f.grpDelta/1000.0,360.0);
+    for(const [ch,name] of CHANS){
+      if(!GRP2.has(name)) continue;
+      const period=(name==='REF2'||name==='TDC2')?360.0:P;
+      centers[name]=mod(centers[name]+dD,period);
+    }
+  }
+  const dig={},edges={};
+  for(const [ch,name] of CHANS){
+    const period=(name==='REF1'||name==='REF2'||name==='TDC1'||name==='TDC2')?360.0:P;
+    const width=p[WKEY[name]], center=centers[name];
+    const arr=new Uint8Array(N); const ed=[0]; let prev=-1;
+    for(let i=0;i<N;i++){
+      const rel=mod(angle[i]-center+0.5*width,period);
+      const lv=rel<width?1:0;
+      arr[i]=lv;
+      if(lv!==prev){ ed.push(i); prev=lv; }
+    }
+    dig[name]=arr; edges[ch]=ed;
+  }
+  const ssi1=new Int32Array(N), ssi2=new Int32Array(N);
+  for(let i=0;i<N;i++){
+    ssi1[i]=roundHalfEven(mod(angle[i]+p.ssi1off,360.0)/360.0*4096.0)%4096
+            | (f.pfb1?(1<<12):0);
+    ssi2[i]=roundHalfEven(mod(angle[i]+p.ssi2off,360.0)/360.0*4096.0)%4096
+            | (f.pfb2?(1<<12):0);
+  }
+  // ---- 故障注入（FR-30/31/34）：在基础信号之后应用；全部关闭 = 与黄金模型位级一致 ----
+  const zDig=f.z.slice(), zSsi=[f.ssi1fail,f.ssi2fail];
+  for(let k=0;k<8;k++){
+    if(zDig[k]){                        // 数字断线: OFF = 高阻（信号按 0 记录/显示）
+      dig[CHANS[k][1]].fill(0);
+      edges[CHANS[k][0]]=[0,N];
+    }
+  }
+  for(let i=0;i<N;i++){                 // SSI: 总失效（高阻）覆盖角度恒定
+    if(f.ssi1fail) ssi1[i]=0;
+    else if(f.ssi1hold) ssi1[i]=sseHold(f.ssi1holdAng)|(f.pfb1?(1<<12):0);
+    if(f.ssi2fail) ssi2[i]=0;
+    else if(f.ssi2hold) ssi2[i]=sseHold(f.ssi2holdAng)|(f.pfb2?(1<<12):0);
+  }
+  return {t,rpm,angle,dig,edges,centers,ssi1,ssi2,N,dt,capped,zDig,zSsi};
+}
+
+/* ---------------- 飞轮绘制 ---------------- */
+function repulse(angs,minGap){
+  const n=angs.length;
+  if(n===0) return [];
+  const a=angs.slice().sort((x,y)=>x-y);
+  for(let it=0;it<100;it++){
+    let moved=false;
+    for(let i=0;i<n;i++){
+      const j=(i+1)%n;
+      const next=(j===0)? a[0]+360 : a[j];
+      const gap=next-a[i];
+      if(gap<minGap-1e-9){
+        const push=(minGap-gap)/2;
+        a[i]-=push;
+        if(j===0) a[0]+=push; else a[j]+=push;
+        moved=true;
+      }
+    }
+    if(!moved) break;
+  }
+  return a;
+}
+function drawFlywheel(p,sim,thetaNow){
+  const cv=$('flywheel'),ctx=cv.getContext('2d');
+  const W=cv.width,C=W/2,S=W/4.3;
+  const xy=(r,a)=>{const rad=a*Math.PI/180;return [C+r*S*Math.sin(rad),C-r*S*Math.cos(rad)];};
+  ctx.clearRect(0,0,W,W);
+  ctx.font='11px "Segoe UI","Microsoft YaHei",sans-serif';
+  // 0/180 参考线
+  ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.setLineDash([6,4]);ctx.lineWidth=1;
+  let [x1,y1]=xy(1.45,0),[x2,y2]=xy(1.45,180);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  [x1,y1]=xy(1.45,90);[x2,y2]=xy(1.45,270);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.textAlign='center';
+  [x1,y1]=xy(1.95,0);ctx.fillText('TDC = 0°',x1,y1+4);
+  [x1,y1]=xy(1.95,180);ctx.fillText('BDC = 180°',x1,y1+4);
+  // 圆盘 + 齿
+  ctx.beginPath();ctx.arc(C,C,0.95*S,0,2*Math.PI);
+  ctx.fillStyle='#dcdcdc';ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.fill();ctx.stroke();
+  const P=360/p.teeth;
+  ctx.fillStyle='#dcdcdc';ctx.strokeStyle='#333';ctx.lineWidth=0.6;
+  for(let k=0;k<p.teeth;k++){
+    const a=p.tooth0+k*P,hw=0.45*0.5*P;
+    const q=[xy(0.95,a-hw),xy(1.08,a-0.55*hw),xy(1.08,a+0.55*hw),xy(0.95,a+hw)];
+    ctx.beginPath();
+    q.forEach((pt,i)=>i?ctx.lineTo(pt[0],pt[1]):ctx.moveTo(pt[0],pt[1]));
+    ctx.closePath();ctx.fill();ctx.stroke();
+  }
+  // 飞轮标记（TDC1/TDC2 同读 1 个 TDC 标记）
+  const mark=(ang,color)=>{
+    const [mx,my]=xy(0.86,ang),[nx,ny]=xy(1.00,ang);
+    ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(nx,ny);
+    ctx.strokeStyle=color;ctx.lineWidth=7;ctx.lineCap='round';ctx.stroke();
+    ctx.lineCap='butt';
+  };
+  mark(p.ref2_mark,COL.REF2);mark(p.ref1_mark,COL.REF1);mark(p.tdc_mark,COL.TDC1);
+  // 传感器安装（三角）+ 防重叠标签（密集安装时: 加大间距 + 双环交替半径 + 白底）
+  const items=CHANS.map(([ch,name])=>({ch,name,ang:mod(p[POSKEY[name]],360)}));
+  const labAng=repulse(items.map(it=>it.ang),10);
+  const order=items.map((it,i)=>i).sort((a,b)=>items[a].ang-items[b].ang);
+  items.forEach((it,i)=>{ it.rank=order.indexOf(i); it.lab=labAng[it.rank]; });
+  for(const it of items){
+    const color=COL[it.name];
+    const [px,py]=xy(1.16,it.ang),[ax,ay]=xy(1.30,it.ang-3.5),[bx,by]=xy(1.30,it.ang+3.5);
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ax,ay);ctx.lineTo(bx,by);ctx.closePath();
+    ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=0.5;ctx.stroke();
+    // 引导线 + 标签（偶数秩内环 / 奇数秩外环）
+    const lr=(it.rank%2===0)?1.62:1.84;
+    const [lx0,ly0]=xy(1.33,it.ang),[lx1,ly1]=xy(lr*0.92,it.lab);
+    ctx.beginPath();ctx.moveTo(lx0,ly0);ctx.lineTo(lx1,ly1);
+    ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=0.8;ctx.stroke();
+    const [lx,ly]=xy(lr,it.lab);
+    ctx.font='bold 10px Consolas,monospace';ctx.textAlign='center';
+    const tw=ctx.measureText(it.ch).width;
+    ctx.fillStyle='rgba(255,255,255,0.88)';
+    ctx.fillRect(lx-tw/2-2,ly-8,tw+4,12);
+    ctx.fillStyle=color;
+    ctx.fillText(it.ch,lx,ly+3);
+  }
+  // 当前角度指示
+  if(thetaNow!=null){
+    const [tx,ty]=xy(0.18,thetaNow),[mx,my]=xy(0.95,thetaNow);
+    ctx.beginPath();ctx.moveTo(C,C);ctx.lineTo(mx,my);
+    ctx.strokeStyle='rgba(0,0,0,0.75)';ctx.lineWidth=1.3;ctx.stroke();
+    ctx.beginPath();ctx.arc(mx,my,3.2,0,2*Math.PI);ctx.fillStyle='#111';ctx.fill();
+  }
+}
+
+/* ---------------- 波形绘制（离屏静态 + 动画游标） ---------------- */
+let offDig=null, offCA=null;
+function waveW(id){return Math.max(420,Math.floor($(id).clientWidth));}
+function niceStep(dur){
+  const target=dur/6;
+  for(const s of [0.1,0.2,0.5,1,2,5,10,15,30,60,120,300]) if(s>=target) return s;
+  return 600;
+}
+function buildOffDig(p,sim){
+  const cv=document.createElement('canvas');
+  cv.width=waveW('waveDig');cv.height=440;
+  const ctx=cv.getContext('2d');
+  const x0=84,x1=cv.width-8,top=6,rowH=52,N=sim.N,dur=sim.t[N-1]||1e-9;
+  const X=t=>x0+t/dur*(x1-x0);
+  // 时间网格
+  const step=niceStep(dur);
+  ctx.font='10px Consolas,monospace';
+  for(let tg=0;tg<=dur+1e-9;tg+=step){
+    const gx=X(tg);
+    ctx.strokeStyle='#e3e8ee';ctx.beginPath();
+    ctx.moveTo(gx,top);ctx.lineTo(gx,top+8*rowH-2);ctx.stroke();
+    ctx.fillStyle='#8892a0';ctx.textAlign='center';
+    ctx.fillText(tg.toFixed(step<1?1:0)+' s',gx,top+8*rowH+12);
+  }
+  CHANS.forEach(([ch,name],i)=>{
+    const rt=top+i*rowH;
+    ctx.fillStyle=i%2?'#f7f8fa':'#ffffff';
+    ctx.fillRect(x0,rt,x1-x0,rowH-2);
+    const yH=rt+10,yL=rt+rowH-12;
+    const z=sim.zDig&&sim.zDig[i];
+    if(z){
+      // 断线故障：高阻 (OFF)，虚线灰平线 + 标注
+      const ym=(yH+yL)/2;
+      ctx.strokeStyle='#9aa4af';ctx.lineWidth=1.2;ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(x0,ym);ctx.lineTo(x1,ym);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#8892a0';ctx.textAlign='left';
+      ctx.font='10px Consolas,monospace';
+      ctx.fillText('高阻 (OFF)',x0+8,ym-6);
+    } else {
+      const arr=sim.dig[name],ed=sim.edges[ch];
+      ctx.strokeStyle=COL[name];ctx.lineWidth=1.4;ctx.beginPath();
+      ctx.moveTo(x0,arr[ed[0]]?yH:yL);
+      for(let j=0;j<ed.length;j++){
+        const iEnd=(j+1<ed.length)?ed[j+1]:N;
+        const xa=X(sim.t[ed[j]]),xb=X(sim.t[Math.min(iEnd-1,N-1)]);
+        const ya=arr[ed[j]]?yH:yL;
+        if(j>0) ctx.lineTo(xa,ya);
+        ctx.lineTo(xb,ya);
+      }
+      ctx.stroke();
+    }
+    // 行分隔 + 标签
+    ctx.strokeStyle='#d9dee5';
+    ctx.beginPath();ctx.moveTo(x0,rt+rowH-2);ctx.lineTo(x1,rt+rowH-2);ctx.stroke();
+    ctx.textAlign='right';ctx.fillStyle=COL[name];
+    ctx.font='bold 11px Consolas,monospace';ctx.fillText(ch,x0-8,rt+rowH/2-1);
+    ctx.font='10px Consolas,monospace';ctx.fillText(name,x0-8,rt+rowH/2+11);
+  });
+  return cv;
+}
+function buildOffCA(p,sim){
+  const cv=document.createElement('canvas');
+  cv.width=waveW('waveCA');cv.height=240;
+  const ctx=cv.getContext('2d');
+  const x0=64,x1=cv.width-34,top=12,bot=212,N=sim.N,dur=sim.t[N-1]||1e-9;
+  const X=t=>x0+t/dur*(x1-x0);
+  // 曲轴角按 0–360000 mDeg 每转回绕显示（与 ECU 角度计数一致）
+  const Y=v=>top+(360000-v)/360000*(bot-top);
+  // 网格
+  const step=niceStep(dur);
+  ctx.font='10px Consolas,monospace';
+  for(let tg=0;tg<=dur+1e-9;tg+=step){
+    const gx=X(tg);
+    ctx.strokeStyle='#e3e8ee';ctx.beginPath();
+    ctx.moveTo(gx,top);ctx.lineTo(gx,bot);ctx.stroke();
+    ctx.fillStyle='#8892a0';ctx.textAlign='center';
+    ctx.fillText(tg.toFixed(step<1?1:0)+' s',gx,bot+14);
+  }
+  for(let k=0;k<=4;k++){
+    const v=360000*k/4, gy=Y(v);
+    ctx.strokeStyle='#eef1f5';ctx.beginPath();
+    ctx.moveTo(x0,gy);ctx.lineTo(x1,gy);ctx.stroke();
+    ctx.fillStyle='#8892a0';ctx.textAlign='right';
+    ctx.fillText(v.toLocaleString(),x0-6,gy+3);
+  }
+  ctx.save();ctx.translate(14,(top+bot)/2);ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center';ctx.fillStyle='#8892a0';ctx.fillText('θ / SSI [mDeg] 0–360000 · rpm',0,0);
+  ctx.restore();
+  const M=1500, st=Math.max(1,Math.floor(N/M));
+  // SSI1 角度（锯齿 0–360）
+  if($('chkSsi').checked){
+    if(sim.zSsi&&sim.zSsi[0]){
+      // SSI1 总失效：高阻 (OFF)，不画轨迹，仅标注
+      ctx.fillStyle='#8892a0';ctx.textAlign='left';
+      ctx.fillText('SSI1 高阻 (OFF)',x0+8,top+12);
+    } else {
+      ctx.strokeStyle='#9aa4af';ctx.lineWidth=1;ctx.beginPath();
+      for(let i=0;i<N;i+=st){
+        const d=(sim.ssi1[i]&0xFFF)*360000/4096, gy=Y(d);
+        i?ctx.lineTo(X(sim.t[i]),gy):ctx.moveTo(X(sim.t[i]),gy);
+      }
+      ctx.stroke();
+    }
+  }
+  // θ 主曲线（锯齿 0–360000 mDeg）
+  ctx.strokeStyle='#0b5fff';ctx.lineWidth=1.8;ctx.beginPath();
+  for(let i=0;i<N;i+=st){
+    const v=mod(sim.angle[i],360)*1000;
+    i?ctx.lineTo(X(sim.t[i]),Y(v)):ctx.moveTo(X(sim.t[i]),Y(v));
+  }
+  ctx.stroke();
+  // rpm（右轴，虚线）
+  if($('chkRpm').checked){
+    const rmin=Math.min(...sim.rpm.filter((_,i)=>i%st===0));
+    const rmax=Math.max(...sim.rpm.filter((_,i)=>i%st===0));
+    const rp=(rmax-rmin)*0.15||1;
+    const YR=v=>top+(rmax+rp-v)/(rmax-rmin+2*rp)*(bot-top);
+    ctx.strokeStyle='#d62728';ctx.setLineDash([5,4]);ctx.lineWidth=1.2;ctx.beginPath();
+    for(let i=0;i<N;i+=st){
+      i?ctx.lineTo(X(sim.t[i]),YR(sim.rpm[i])):ctx.moveTo(X(sim.t[i]),YR(sim.rpm[i]));
+    }
+    ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#d62728';ctx.textAlign='left';
+    ctx.fillText(rmax.toFixed(0),x1+6,top+8);
+    ctx.fillText(rmin.toFixed(0),x1+6,bot);
+  }
+  return cv;
+}
+function blit(off,main){
+  if(main.width!==off.width||main.height!==off.height){
+    main.width=off.width;main.height=off.height;
+  }
+  const ctx=main.getContext('2d');
+  ctx.clearRect(0,0,main.width,main.height);
+  ctx.drawImage(off,0,0);
+}
+function drawCursor(main,x0px){
+  if(x0px==null) return;
+  const ctx=main.getContext('2d');
+  ctx.strokeStyle='rgba(214,39,40,0.75)';ctx.lineWidth=1;
+  ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(x0px,0);ctx.lineTo(x0px,main.height);ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ---------------- 派生参数 / 状态 ---------------- */
+function updateDerived(p,sim,f){
+  const P=360/p.teeth;
+  const rows=[['齿周期',`${(360000/p.teeth).toFixed(1)} mDeg`]];
+  const c=[];
+  for(const [ch,name] of CHANS) c.push(`<b style="color:${COL[name]}">${ch}</b> ${name} = ${Math.round(sim.centers[name]*1000).toLocaleString()} mDeg`);
+  rows.push(['脉冲中心 (mDeg)', c.join('<br>')]);
+  rows.push(['故障状态',(f&&f.any)?`<span style="color:#b45309">${faultList(f)}</span>`:'全关（显式使能才注入，FR-34）']);
+  const mRpm=Math.max(1e-9,maxAbsRpm(p));
+  const wmin=Math.min(p.a_width,p.b_width,p.c_width,p.d_width,
+                      p.ref1_width,p.ref2_width,p.tdc1_width,p.tdc2_width);
+  const samplesPerPulse=wmin/(6*mRpm)/ (p.dtus*1e-6);
+  rows.push(['采样检查',
+    `dt=${p.dtus} µs @ ${mRpm.toFixed(0)} rpm → ${(mRpm*6*p.dtus*1e-3).toFixed(1)} mDeg/样本；`+
+    `最窄脉冲 ${(wmin*1000).toLocaleString()} mDeg = ${samplesPerPulse.toFixed(1)} 样本/脉冲`+
+    (samplesPerPulse<4?' <span style="color:#b45309">⚠ 建议减小 dt</span>':'')]);
+  rows.push(['样本数 / 时长',`N = ${sim.N.toLocaleString()}，时长 = ${((sim.N-1)*sim.dt).toFixed(4)} s`]);
+  $('derived').innerHTML=rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('');
+}
+function status(msg,warn){
+  const el=$('status');
+  el.textContent=msg;
+  el.className=warn?'warn':'';
+}
+
+/* ---------------- 实时数据 ---------------- */
+const chips={};
+function buildChips(){
+  const box=$('chips');box.innerHTML='';
+  for(const [ch,name] of CHANS){
+    const s=document.createElement('span');
+    s.className='chip';s.id='chip_'+ch;
+    s.style.borderColor=COL[name];
+    s.textContent=ch+' '+name;
+    box.appendChild(s);
+    chips[ch]=s;
+  }
+}
+function renderLive(sim,idx,withCursor){
+  const i=idx;
+  const zs=sim.zSsi||[false,false];
+  $('lvT').textContent=sim.t[i].toFixed(4);
+  $('lvA').textContent=Math.round(mod(sim.angle[i],360)*1000).toLocaleString();
+  $('lvR').textContent=sim.rpm[i].toFixed(2);
+  $('lvS1').textContent=zs[0]?'–':sim.ssi1[i];
+  $('lvS2').textContent=zs[1]?'–':sim.ssi2[i];
+  let ptxt='';
+  if(!zs[0]&&sim.ssi1[i]>>12)ptxt+='1|';
+  if(!zs[1]&&sim.ssi2[i]>>12)ptxt+='2|';
+  $('lvP').textContent=ptxt||'–';
+  CHANS.forEach(([ch,name],k)=>{
+    const el=chips[ch];
+    const z=sim.zDig&&sim.zDig[k];
+    if(z){                                   // 断线: 高阻 (OFF) → 虚线灰 chip
+      el.className='chip z';
+      el.style.borderStyle='dashed';
+      el.style.background='#eef0f3';
+      el.style.color='#8892a0';
+      el.title='高阻 (OFF)';
+    } else {
+      const on=sim.dig[name][i]===1;
+      el.className='chip'+(on?' on':'');
+      el.style.borderStyle='';
+      el.style.background=on?COL[name]:'#fff';
+      el.style.color=on?'#fff':'var(--mut)';
+      el.title='';
+    }
+  });
+  const dur=(sim.N-1)*sim.dt;
+  let theta=sim.angle[i];
+  drawFlywheel(paramsRef,sim,withCursor?theta:null);
+  // 波形游标
+  if(withCursor){
+    const durReal=dur;
+    const wd=$('waveDig'),wc=$('waveCA');
+    blit(offDig,wd);blit(offCA,wc);
+    const xd=84+sim.t[i]/durReal*(wd.width-84);
+    const xc=64+sim.t[i]/durReal*(wc.width-64);
+    drawCursor(wd,xd);drawCursor(wc,xc);
+  }
+}
+
+/* ---------------- 动态运行（实时仿真 + 滚动示波；运行中可随时设定转速） ----------------
+   运行中每帧按当前输入参数逐步推进（与 casim 同公式：梯形积分 + 方波 + SSI 编码），
+   修改转速/类型等参数即时生效（不重算整条曲线）；停止后回到静态预计算预览。 */
+const RUN = { state:'stopped', t:0, theta:0, rpmPrev:0, scale:1, lastNow:0, params:null };
+const WIN_S = 1.0;            // 滚动示波窗口 [s]
+const NUMKEYS = ['tooth0','ref1_mark','ref2_mark','tdc_mark',
+  'pos_a','pos_b','pos_ref1','pos_c','pos_d','pos_ref2','pos_tdc1','pos_tdc2',
+  'a_width','b_width','c_width','d_width','ref1_width','ref2_width','tdc1_width','tdc2_width',
+  'rpm','startRpm','targetRpm','accel','amp','freq','duration','dtus','startAngle','ssi2off'];
+let rafId=null, ivId=null, fbId=null, driver='raf';
+let ring=null;
+function stopScheduler(){
+  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  if(ivId){clearInterval(ivId);ivId=null;}
+  if(fbId){clearTimeout(fbId);fbId=null;}
+  driver='raf';
+}
+function startScheduler(){
+  stopScheduler();
+  let fired=false;
+  rafId=requestAnimationFrame(now=>{
+    fired=true;rafId=null;
+    if(RUN.state==='running') frame(now);
+  });
+  // 回退: 后台窗口/部分嵌入式 webview 中 rAF 不触发 → 改用 16 ms 定时器
+  fbId=setTimeout(()=>{
+    fbId=null;
+    if(fired) return;
+    if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+    driver='interval';
+    ivId=setInterval(()=>{ if(RUN.state==='running') frame(performance.now()); },16);
+  },250);
+}
+function ringAlloc(dt){
+  const M=Math.max(64,Math.round(WIN_S/dt));
+  ring={M,head:0,vi:0,dt,
+    t:new Float64Array(M),th:new Float64Array(M),rpm:new Float64Array(M),
+    ssi1:new Int32Array(M),ssi2:new Int32Array(M),
+    dig:CHANS.map(()=>new Uint8Array(M))};
+}
+function readLiveParams(){
+  const r=readParams();
+  if(r.error) return RUN.params;             // 非法输入 → 保持最近一次有效参数
+  const p=r.p;
+  if(!isFinite(p.teeth)||NUMKEYS.some(k=>!isFinite(p[k]))) return RUN.params;
+  const P=360.0/p.teeth, centers={};
+  for(const [ch,name] of CHANS){
+    const period=(name==='REF1'||name==='REF2'||name==='TDC1'||name==='TDC2')?360.0:P;
+    const mark=(name==='REF1')?p.ref1_mark:(name==='REF2')?p.ref2_mark:
+               (name==='TDC1'||name==='TDC2')?p.tdc_mark:p.tooth0;
+    centers[name]=mod(p[POSKEY[name]]-mark,period);
+  }
+  const f=readFaults();
+  if(f.grp){                                 // 两组 CA 差值：组 2 中心平移 Δ（与 simulate 同式）
+    const dD=mod(f.grpDelta/1000.0,360.0);
+    for(const [ch,name] of CHANS){
+      if(!GRP2.has(name)) continue;
+      const period=(name==='REF2'||name==='TDC2')?360.0:P;
+      centers[name]=mod(centers[name]+dD,period);
+    }
+  }
+  p._centers=centers;
+  p._faults=f;
+  RUN.params=p;
+  return p;
+}
+function liveStep(p,dt){
+  RUN.t+=dt;
+  const rpm=profileRpm(RUN.t,p);                    // 按当前参数实时求转速
+  RUN.theta+=0.5*(RUN.rpmPrev+rpm)*6.0*dt;          // 梯形积分（同 casim）
+  RUN.rpmPrev=rpm;
+  const th=RUN.theta, P=360.0/p.teeth;
+  const f=p._faults;
+  const lv=new Uint8Array(8);
+  for(let k=0;k<8;k++){
+    const name=CHANS[k][1];
+    const period=(name==='REF1'||name==='REF2'||name==='TDC1'||name==='TDC2')?360.0:P;
+    const L=p[WKEY[name]];
+    lv[k]=mod(th-p._centers[name]+0.5*L,period)<L?1:0;
+    if(f.z[k]) lv[k]=0;                       // 断线: OFF = 高阻
+  }
+  const zS1=f.ssi1fail, zS2=f.ssi2fail;
+  const s1=zS1?0:(f.ssi1hold? sseHold(f.ssi1holdAng)
+                            : roundHalfEven(mod(th+p.ssi1off,360.0)/360.0*4096.0)%4096)
+              |(f.pfb1?(1<<12):0);
+  const s2=zS2?0:(f.ssi2hold? sseHold(f.ssi2holdAng)
+                            : roundHalfEven(mod(th+p.ssi2off,360.0)/360.0*4096.0)%4096)
+              |(f.pfb2?(1<<12):0);
+  RUN.z={dig:f.z,ssi:[zS1,zS2]};             // 当前 Z 态（断线/SSI 高阻），供示波与读数用
+  const r=ring,i=r.head;
+  r.t[i]=RUN.t;r.th[i]=RUN.theta;r.rpm[i]=rpm;
+  r.ssi1[i]=s1;r.ssi2[i]=s2;
+  for(let k=0;k<8;k++)r.dig[k][i]=lv[k];
+  r.head=(i+1)%r.M;r.vi++;
+  return {lv,s1,s2,rpm};
+}
+function setAnimButtons(){
+  $('btnRun').disabled=(RUN.state==='running');
+  $('btnPause').disabled=(RUN.state!=='running');
+  $('btnStop').disabled=(RUN.state==='stopped');
+}
+function startAnim(){
+  if(!simRef) return;
+  const p=readLiveParams();
+  if(RUN.state!=='paused'){
+    RUN.t=0;RUN.theta=p.startAngle;RUN.rpmPrev=profileRpm(0,p);
+    ringAlloc(p.dtus*1e-6);
+  }
+  RUN.state='running';
+  RUN.lastNow=performance.now();
+  startScheduler();
+  setAnimButtons();
+}
+function pauseAnim(){
+  if(RUN.state!=='running') return;
+  RUN.state='paused';
+  stopScheduler();
+  setAnimButtons();
+}
+function stopAnim(){
+  if(RUN.state==='stopped') return;
+  RUN.state='stopped';
+  stopScheduler();
+  recompute();                    // 按当前参数重建静态预览（含运行中的修改）
+}
+function frame(now){
+  if(RUN.state!=='running'){stopScheduler();return;}
+  let dtr=(now-RUN.lastNow)/1000;RUN.lastNow=now;
+  if(dtr<0)dtr=0; if(dtr>0.1)dtr=0.1;          // 切页回归时不追大跳
+  RUN.scale=parseFloat($('timeScale').value)||1;
+  const p=readLiveParams();
+  const dt=p.dtus*1e-6;
+  if(!ring||ring.dt!==dt) ringAlloc(dt);
+  const nStep=Math.min(Math.max(1,Math.round(dtr*RUN.scale/dt)),Math.ceil(0.1/dt));
+  let last=null;
+  for(let k=0;k<nStep;k++) last=liveStep(p,dt);
+  if(last){
+    drawLiveScope();
+    renderLiveVals(p,last);
+    status(`运行中 t=${RUN.t.toFixed(2)} s · 时标 ${RUN.scale}× · 窗口 ${WIN_S} s · 修改转速即时生效`);
+  }
+  if(RUN.state==='running'&&driver==='raf'){
+    rafId=requestAnimationFrame(now=>{ if(RUN.state==='running') frame(now); });
+  }
+}
+function renderLiveVals(p,last){
+  const zd=RUN.z?RUN.z.dig:null, zs=RUN.z?RUN.z.ssi:[false,false];
+  $('lvT').textContent=RUN.t.toFixed(4);
+  $('lvA').textContent=Math.round(mod(RUN.theta,360)*1000).toLocaleString();
+  $('lvR').textContent=last.rpm.toFixed(2);
+  $('lvS1').textContent=zs[0]?'–':last.s1;
+  $('lvS2').textContent=zs[1]?'–':last.s2;
+  let ptxt='';
+  if(!zs[0]&&last.s1>>12)ptxt+='1|';
+  if(!zs[1]&&last.s2>>12)ptxt+='2|';
+  $('lvP').textContent=ptxt||'–';
+  for(let k=0;k<8;k++){
+    const [ch,name]=CHANS[k];
+    const el=chips[ch];
+    if(zd&&zd[k]){                            // 断线: 高阻 (OFF) → 虚线灰 chip
+      el.className='chip z';
+      el.style.borderStyle='dashed';
+      el.style.background='#eef0f3';
+      el.style.color='#8892a0';
+      el.title='高阻 (OFF)';
+    } else {
+      const on=last.lv[k]===1;
+      el.className='chip'+(on?' on':'');
+      el.style.borderStyle='';
+      el.style.background=on?COL[name]:'#fff';
+      el.style.color=on?'#fff':'var(--mut)';
+      el.title='';
+    }
+  }
+  drawFlywheel(p,null,RUN.theta);
+}
+function drawLiveScope(){
+  const r=ring;
+  if(r.vi<2) return;
+  const M=r.M,dt=r.dt,vi=r.vi;
+  const tEnd=RUN.t,tStart=Math.max(0,tEnd-WIN_S);
+  // 虚拟索引: 样本 v 的时间 = RUN.t - (vi-1-v)*dt
+  const vof=t=>(vi-1)+(t-RUN.t)/dt;
+  const vcl=v=>{v=Math.round(v);return (v<0||v>=vi)?-1:v;};
+  /* --- CH00–CH07 数字滚动 --- */
+  const cv=$('waveDig');
+  cv.width=waveW('waveDig');cv.height=440;   // 同步容器宽度（窗口缩放自适应）
+  const ctx=cv.getContext('2d');
+  const x0=84,x1=cv.width-8,top=6,rowH=52;
+  const X=t=>x0+(t-tStart)/WIN_S*(x1-x0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.font='10px Consolas,monospace';
+  for(let k=Math.ceil(tStart/0.2-1e-9);k*0.2<=tEnd+1e-9;k++){
+    const tg=k*0.2,gx=X(tg);
+    ctx.strokeStyle='#e3e8ee';ctx.beginPath();ctx.moveTo(gx,top);ctx.lineTo(gx,top+8*rowH-2);ctx.stroke();
+    ctx.fillStyle='#8892a0';ctx.textAlign='center';
+    ctx.fillText(tg.toFixed(1)+' s',gx,top+8*rowH+12);
+  }
+  CHANS.forEach(([ch,name],i)=>{
+    const rt=top+i*rowH,yH=rt+10,yL=rt+rowH-12;
+    ctx.fillStyle=i%2?'#f7f8fa':'#ffffff';
+    ctx.fillRect(x0,rt,x1-x0,rowH-2);
+    const z=RUN.z&&RUN.z.dig&&RUN.z.dig[i];
+    if(z){
+      // 断线故障：高阻 (OFF)，虚线灰平线 + 标注
+      const ym=(yH+yL)/2;
+      ctx.strokeStyle='#9aa4af';ctx.lineWidth=1.2;ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(x0,ym);ctx.lineTo(x1,ym);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#8892a0';ctx.textAlign='left';
+      ctx.fillText('高阻 (OFF)',x0+8,ym-6);
+    } else {
+      const arr=r.dig[i];
+      ctx.strokeStyle=COL[name];ctx.lineWidth=1.4;ctx.beginPath();
+      let started=false,curY=null;
+      for(let x=x0;x<x1;x++){
+        const c0=tStart+(x-x0)/(x1-x0)*WIN_S;
+        const c1=tStart+(x+1-x0)/(x1-x0)*WIN_S;
+        const vA=vcl(vof(c0));
+        if(vA<0){continue;}
+        const lvA=arr[vA%M],yA=lvA?yH:yL;
+        if(!started){ctx.moveTo(x,yA);started=true;curY=yA;}
+        else{
+          if(yA!==curY){ctx.lineTo(x,curY);ctx.lineTo(x,yA);}
+          ctx.lineTo(x,yA);
+        }
+        const vB=vcl(vof(c1));
+        if(vB>=0&&vB!==vA){
+          const lvB=arr[vB%M],yB=lvB?yH:yL;
+          ctx.lineTo(x+1,yA);ctx.lineTo(x+1,yB);curY=yB;
+        }else ctx.lineTo(x+1,yA);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle='#d9dee5';
+    ctx.beginPath();ctx.moveTo(x0,rt+rowH-2);ctx.lineTo(x1,rt+rowH-2);ctx.stroke();
+    ctx.textAlign='right';ctx.fillStyle=COL[name];
+    ctx.font='bold 11px Consolas,monospace';ctx.fillText(ch,x0-8,rt+rowH/2-1);
+    ctx.font='10px Consolas,monospace';ctx.fillText(name,x0-8,rt+rowH/2+11);
+  });
+  /* --- CA 滚动（θ/SSI 固定 0–360000 mDeg 量程 / rpm 右轴） --- */
+  const cv2=$('waveCA');
+  cv2.width=waveW('waveCA');cv2.height=240;
+  const ctx2=cv2.getContext('2d');
+  const a0=64,a1=cv2.width-34,tp=12,bt=212;
+  const X2=t=>a0+(t-tStart)/WIN_S*(a1-a0);
+  ctx2.clearRect(0,0,cv2.width,cv2.height);
+  ctx2.font='10px Consolas,monospace';
+  for(let k=Math.ceil(tStart/0.2-1e-9);k*0.2<=tEnd+1e-9;k++){
+    const tg=k*0.2,gx=X2(tg);
+    ctx2.strokeStyle='#e3e8ee';ctx2.beginPath();ctx2.moveTo(gx,tp);ctx2.lineTo(gx,bt);ctx2.stroke();
+    ctx2.fillStyle='#8892a0';ctx2.textAlign='center';
+    ctx2.fillText(tg.toFixed(1)+' s',gx,bt+14);
+  }
+  let rmin=Infinity,rmax=-Infinity;
+  for(let x=a0;x<=a1;x+=4){
+    const v=vcl(vof(tStart+(x-a0)/(a1-a0)*WIN_S));
+    if(v<0)continue;
+    if(r.rpm[v%M]<rmin)rmin=r.rpm[v%M];
+    if(r.rpm[v%M]>rmax)rmax=r.rpm[v%M];
+  }
+  const rp=(rmax-rmin)*0.15||1;
+  const YR=v=>tp+(rmax+rp-v)/(rmax-rmin+2*rp)*(bt-tp);
+  const Y=v=>tp+(360000-v)/360000*(bt-tp);   // θ/SSI 固定 0–360000 mDeg
+  for(let k=0;k<=4;k++){
+    const v=360000*k/4,gy=Y(v);
+    ctx2.strokeStyle='#eef1f5';ctx2.beginPath();ctx2.moveTo(a0,gy);ctx2.lineTo(a1,gy);ctx2.stroke();
+    ctx2.fillStyle='#8892a0';ctx2.textAlign='right';
+    ctx2.fillText(v.toLocaleString(),a0-6,gy+3);
+  }
+  ctx2.save();ctx2.translate(14,(tp+bt)/2);ctx2.rotate(-Math.PI/2);
+  ctx2.textAlign='center';ctx2.fillStyle='#8892a0';ctx2.fillText('θ / SSI [mDeg] 0–360000 · rpm',0,0);
+  ctx2.restore();
+  // SSI1 锯齿（灰）
+  let ps=false;
+  if(RUN.z&&RUN.z.ssi[0]){
+    // SSI1 总失效：高阻 (OFF)，不画轨迹，仅标注
+    ctx2.fillStyle='#8892a0';ctx2.textAlign='left';
+    ctx2.fillText('SSI1 高阻 (OFF)',a0+8,tp+14);
+  } else {
+    ctx2.strokeStyle='#9aa4af';ctx2.lineWidth=1;ctx2.beginPath();
+    for(let x=a0;x<=a1;x+=2){
+      const v=vcl(vof(tStart+(x-a0)/(a1-a0)*WIN_S));
+      if(v<0){ps=false;continue;}
+      const d=(r.ssi1[v%M]&0xFFF)*360000/4096;
+      ps?ctx2.lineTo(x,Y(d)):ctx2.moveTo(x,Y(d));ps=true;
+    }
+    ctx2.stroke();
+  }
+  // θ 主曲线
+  ctx2.strokeStyle='#0b5fff';ctx2.lineWidth=1.8;ctx2.beginPath();
+  ps=false;
+  for(let x=a0;x<=a1;x+=2){
+    const v=vcl(vof(tStart+(x-a0)/(a1-a0)*WIN_S));
+    if(v<0){ps=false;continue;}
+    const vTh=mod(r.th[v%M],360)*1000;
+    ps?ctx2.lineTo(x,Y(vTh)):ctx2.moveTo(x,Y(vTh));ps=true;
+  }
+  ctx2.stroke();
+  // rpm（右轴虚线）
+  if($('chkRpm').checked){
+    ctx2.strokeStyle='#d62728';ctx2.setLineDash([5,4]);ctx2.lineWidth=1.2;ctx2.beginPath();
+    ps=false;
+    for(let x=a0;x<=a1;x+=2){
+      const v=vcl(vof(tStart+(x-a0)/(a1-a0)*WIN_S));
+      if(v<0){ps=false;continue;}
+      ps?ctx2.lineTo(x,YR(r.rpm[v%M])):ctx2.moveTo(x,YR(r.rpm[v%M]));ps=true;
+    }
+    ctx2.stroke();ctx2.setLineDash([]);
+    ctx2.fillStyle='#d62728';ctx2.textAlign='left';
+    ctx2.fillText(rmax.toFixed(0),a1+6,tp+8);
+    ctx2.fillText(rmin.toFixed(0),a1+6,bt);
+  }
+}
+
+/* ---------------- CSV 导出（与 casim 同格式） ---------------- */
+$('btnCsv').addEventListener('click',()=>{
+  if(!simRef)return;
+  const s=simRef,p=paramsRef;
+  $('csvInfo').textContent='生成中…';
+  setTimeout(()=>{
+    const cols=['t_s','angle_deg','speed_rpm',...CHANS.map(c=>c[0]),'ssi1','ssi2'];
+    const rows=new Array(s.N+1);
+    rows[0]=cols.join(',');
+    for(let i=0;i<s.N;i++){
+      rows[i+1]=[s.t[i].toFixed(6),s.angle[i].toFixed(4),s.rpm[i].toFixed(3),
+        ...CHANS.map(([ch])=>s.dig[ch===CHANS[0][0]?'TDC1':
+          ch==='CH01'?'REF1':ch==='CH02'?'A':ch==='CH03'?'B':
+          ch==='CH04'?'REF2':ch==='CH05'?'C':ch==='CH06'?'D':'TDC2'][i]),
+        s.ssi1[i],s.ssi2[i]].join(',');
+    }
+    const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='casim_web_'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $('csvInfo').textContent=`已导出 ${s.N.toLocaleString()} 行`+
+      (faultsRef&&faultsRef.any?'（含故障注入，高阻=0）':'');
+  },30);
+});
+
+/* ---------------- 主流程 ---------------- */
+let simRef=null,paramsRef=null,faultsRef=null;
+function showProfileRows(type){
+  const show=(id,on)=>$(id).classList.toggle('hidden',!on);
+  show('rowRpm',type!=='ramp');
+  show('rowStart',type==='ramp');
+  show('rowTarget',type==='ramp');
+  show('rowAccel',type==='ramp');
+  show('rowAmp',type==='fluct');
+  show('rowFreq',type==='fluct');
+  $('lblRpm').textContent=type==='fluct'?'基线 rpm':'目标/基线 rpm';
+}
+function recompute(){
+  const r=readParams();
+  if(r.error){
+    status(r.error,true);
+    RUN.state='stopped';
+    stopScheduler();
+    if(simRef) renderLive(simRef,0,false);
+    setAnimButtons();
+    return;
+  }
+  const p=r.p;paramsRef=p;
+  faultsRef=readFaults();
+  const t0=performance.now();
+  simRef=simulate(p,faultsRef);
+  offDig=buildOffDig(p,simRef);
+  offCA=buildOffCA(p,simRef);
+  blit(offDig,$('waveDig'));
+  blit(offCA,$('waveCA'));
+  updateDerived(p,simRef,faultsRef);
+  const ms=Math.round(performance.now()-t0);
+  status(`N=${simRef.N.toLocaleString()} 样本 · dt=${p.dtus} µs · 计算 ${ms} ms`+
+         (simRef.capped?' · ⚠ 样本数超上限已截断':''));
+  RUN.state='stopped';
+  stopScheduler();
+  renderLive(simRef,0,false);
+  setAnimButtons();
+}
+let debTimer=null;
+function scheduleRecompute(){
+  if(RUN.state!=='stopped') return;   // 运行/暂停中: 参数实时生效, 停止时再刷新静态预览
+  clearTimeout(debTimer);debTimer=setTimeout(recompute,120);
+}
+document.querySelectorAll('input,select').forEach(el=>{
+  if(el.id==='profType'){
+    el.addEventListener('change',()=>{showProfileRows(el.value);
+      if(RUN.state==='stopped')recompute();});
+  }else if(el.id!=='chkLoop'&&el.id!=='chkSsi'&&el.id!=='chkRpm'&&el.id!=='timeScale'){
+    el.addEventListener('input',scheduleRecompute);
+    el.addEventListener('change',scheduleRecompute);
+  }
+});
+$('chkSsi').addEventListener('change',()=>{if(simRef&&RUN.state==='stopped'){
+  offCA=buildOffCA(paramsRef,simRef);blit(offCA,$('waveCA'));}});
+$('chkRpm').addEventListener('change',()=>{if(simRef&&RUN.state==='stopped'){
+  offCA=buildOffCA(paramsRef,simRef);blit(offCA,$('waveCA'));}});
+$('btnDefault').addEventListener('click',()=>applyPreset('default'));
+$('btnX1').addEventListener('click',()=>applyPreset('x1plus'));
+$('btnRun').addEventListener('click',startAnim);
+$('btnPause').addEventListener('click',pauseAnim);
+$('btnStop').addEventListener('click',stopAnim);
+let rszTimer=null;
+window.addEventListener('resize',()=>{   // 窗口缩放：停止态重绘静态预览；运行态每帧自动适应
+  clearTimeout(rszTimer);
+  rszTimer=setTimeout(()=>{if(RUN.state==='stopped')recompute();},150);
+});
+
+/* 初始化 */
+(function init(){
+  buildChips();
+  const leg=$('legend');
+  for(const [ch,name] of CHANS){
+    const s=document.createElement('span');
+    s.className='chip';s.style.borderColor=COL[name];s.style.color=COL[name];
+    s.textContent=`${ch}=${name}`;
+    leg.appendChild(s);
+  }
+  showProfileRows('const');
+  applyPreset('x1plus');
+})();
+</script>
+</body>
+</html>
