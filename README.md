@@ -22,6 +22,8 @@ west flash -d apps/cas-sim/build
 ## 状态
 
 - [x] 板级 bring-up 骨架（LED 心跳）
-- [ ] `cas_core` / `cas_fault` 位级移植（`HANDOFF.md` §7：运算顺序、
-      黄金哈希 §6、故障注入 FR-30~34）
-- [ ] 信号输出引脚映射（取自试验台 KiCad 工程）
+- [x] `cas_core` 虚拟 CA 核心位级移植（虚拟飞轮 + 8 路方波 + 双 SSI；
+      `test/test_golden.c` 黄金哈希与 HANDOFF.md §6 全部一致）
+- [ ] `cas_fault` 故障注入（FR-30~FR-34，HANDOFF.md §7.4）
+- [ ] 定时器驱动 `cas_step()` + GPIO/SSI 引脚输出（引脚映射取自 KiCad 工程）
+- [ ] 参数接口（预置切换 / shell / 上位机在线改参）

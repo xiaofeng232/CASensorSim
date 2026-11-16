@@ -1,2 +1,5 @@
 # Zephyr build directory
 build/
+
+# Host test binary (test/Makefile)
+test/test_golden
