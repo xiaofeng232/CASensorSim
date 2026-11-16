@@ -1,0 +1,32 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * CASensorSim app overlay for the FK407M2-ZGT6 (STM32F407ZGT6).
+ *
+ * The board-level overlay points the console at the USB CDC-ACM port;
+ * this app has no USB stack, so console/shell go back to USART1
+ * (PA9/PA10, on the SWD/USART1 header).
+ *
+ * Signal generation timing: TIM8 update events at 100 kHz (10 us tick
+ * per the pin-partition plan); the update interrupt drives cas_step()
+ * (see main.c). The 8 digital outputs CH00..CH07 sit on PE0..PE7
+ * (KiCad pin partition): driven per dig[] while oe=1, high-Z (input)
+ * while oe=0. SSI words are computed every tick; the SSI pin layer
+ * (PA8/PC0 + DIR, TIM6 protocol timing) is a later step.
+ */
+
+/ {
+	chosen {
+		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
+	};
+};
+
+&timers8 {
+	status = "okay";
+	st,prescaler = <0>;
+
+	counter {
+		status = "okay";
+	};
+};

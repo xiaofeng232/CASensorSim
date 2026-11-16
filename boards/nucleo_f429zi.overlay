@@ -1,0 +1,17 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * CASensorSim app overlay for the NUCLEO-F429ZI (kept buildable next to
+ * the FK407M2-ZGT6 target): same signal timing, TIM8 update events at
+ * 100 kHz driving cas_step() (see main.c). Console stays the board
+ * default (USART3 / ST-LINK VCP).
+ */
+
+&timers8 {
+	status = "okay";
+	st,prescaler = <0>;
+
+	counter {
+		status = "okay";
+	};
+};
