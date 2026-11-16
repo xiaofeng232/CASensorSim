@@ -19,6 +19,17 @@ west build -b nucleo_f429zi apps/cas-sim
 west flash -d apps/cas-sim/build
 ```
 
+## 目录结构
+
+```
+cas/                     虚拟 CA 引擎库（平台无关，host 直接编译同一份源码）
+├── include/             对外头文件：cas_core.h（API）、cas_preset.h（预置参数）
+├── src/                 实现：cas_core.c（虚拟飞轮 + 8 路方波 + 双 SSI）
+└── CMakeLists.txt       zephyr_library()；app 经 add_subdirectory() 挂载
+src/main.c               app 层（板级 bring-up，后续接定时器/GPIO 输出）
+test/                    主机黄金测试（纯 C11，不依赖 Zephyr：make -C test test）
+```
+
 ## 状态
 
 - [x] 板级 bring-up 骨架（LED 心跳）
