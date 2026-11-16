@@ -192,6 +192,8 @@ void cas_init(cas_state_t *st, const cas_cfg_t *cfg,
 	st->rpm = cas_profile_rpm(&st->prof, st->t);
 	st->rpm_prev = st->rpm;
 	st->theta = st->start + st->cum;
+	st->ssi_fail[0] = 0; /* fault injection flags start cleared */
+	st->ssi_fail[1] = 0;
 	cas_compute(st);
 }
 

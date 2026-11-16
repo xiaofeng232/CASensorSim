@@ -4,8 +4,8 @@
 CC      ?= cc
 CFLAGS  ?= -O2 -std=c11 -Wall -Wextra
 INC     := -I../cas/include
-SRC     := ../cas/src/cas_core.c
-HDR     := ../cas/include/cas_core.h ../cas/include/cas_preset.h
+SRC     := ../cas/src/cas_core.c ../cas/src/cas_fault.c
+HDR     := ../cas/include/cas_core.h ../cas/include/cas_fault.h ../cas/include/cas_preset.h
 
 .PHONY: test clean
 

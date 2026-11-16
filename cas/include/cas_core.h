@@ -103,6 +103,7 @@ typedef struct {
 	uint8_t oe[CAS_N_DIG];   /* output enable (1 = driven, 0 = high-Z) */
 	int32_t ssi1;      /* SSI1 word: 12 bit angle | pfb<<12 */
 	int32_t ssi2;      /* SSI2 word: 12 bit angle | pfb<<12 */
+	uint8_t ssi_fail[CAS_N_SSI]; /* 1 = SSI stream high-Z (fault inject) */
 
 	/* -- private: precomputed geometry / integration state -- */
 	double start;      /* start angle [deg] (fixed 0.0 for now) */
