@@ -6,9 +6,10 @@
 # bit-exact cas_core / cas_fault port of the casim golden model lives in
 # cas/ (include/ + src/, plain library, host-testable with test/). The app
 # layer (src/main.cpp) runs the 100 kHz TIM8 signal path and publishes the
-# CasIntf telemetry/parameter interface over Fibre on the USB CDC-ACM
-# virtual serial port (Type-C connector); the interface autogen code is
-# generated at build time from interface/cas_interface.yaml
+# CasIntf telemetry/parameter interface over Fibre on the native USB bulk
+# interface (Type-C connector; UART fallback on boards without a device
+# controller); the interface autogen code is generated at build time from
+# interface/cas_interface.yaml
 # with the generator shipped in the Fibre module -- nothing generated is
 # committed.
 #
@@ -33,12 +34,14 @@ git_version_init(${CMAKE_CURRENT_LIST_DIR})
 include(${CMAKE_CURRENT_LIST_DIR}/../../scripts/platform_version.cmake)
 platform_version_init(${CMAKE_CURRENT_LIST_DIR})
 
-# Platform banner module only (lib/util/banner as its own Zephyr module): it
-# provides the boot banner and the banner_logo() hook without pulling in the
-# rest of the platform lib module, whose MFCS runtime services would leak
-# into this app (e.g. NETCFG defaults to y under NETWORKING).
+# Platform modules: the boot banner (lib/util/banner) and the Fibre
+# transport backends (lib/services/fibre-transport). Both are registered as
+# their own Zephyr modules so the rest of the platform lib (whose MFCS
+# runtime services leak into unrelated applications, e.g. NETCFG defaults
+# to y under NETWORKING) is not pulled in.
 list(APPEND EXTRA_ZEPHYR_MODULES
-     ${CMAKE_CURRENT_LIST_DIR}/../../lib/util/banner)
+     ${CMAKE_CURRENT_LIST_DIR}/../../lib/util/banner
+     ${CMAKE_CURRENT_LIST_DIR}/../../lib/services/fibre-transport)
 
 # Out-of-tree board root (boards/others/fk407m2_zgt6).
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
@@ -103,7 +106,6 @@ add_custom_command(
 target_sources(app PRIVATE
     src/main.cpp
     src/logo.cpp
-    src/uart_backend.cpp
     ${AUTOGEN_DIR}/endpoints.cpp
     ${AUTOGEN_DIR}/static_exports.cpp
 )

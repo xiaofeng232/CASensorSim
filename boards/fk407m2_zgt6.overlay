@@ -3,18 +3,18 @@
  *
  * CASensorSim app overlay for the FK407M2-ZGT6 (STM32F407ZGT6).
  *
- * The Fibre protocol (CasIntf telemetry/parameter interface) runs over the
- * USB CDC-ACM virtual serial port on the Type-C connector: the board has no
- * USB-UART bridge, and the `fibre-uart` alias below selects the port for
- * src/uart_backend.cpp (the irq-driven UART API it uses is implemented by
- * the USB device stack's cdc_acm class driver). The cdc_acm_uart0 node and
- * the USB device stack come from the board overlay/fragment, shared with
- * the matrix-cards app.
+ * The Fibre protocol (CasIntf telemetry/parameter interface) runs over a
+ * vendor-specific USB bulk interface on the Type-C connector: the board has
+ * no USB-UART bridge, so the native USB device controller is used directly
+ * (host side: libusb; the interface carries the Fibre protocol as a raw
+ * byte stream). The `fibre-usb` alias below selects the UDC controller for
+ * the platform fibre-transport module, which builds the USBD context and
+ * the vendor interface (class codes 0xFF/0x01/0x01) on top of it.
  *
  * USART1 is not used by this app and is disabled below, so PA9/PA10 stay
- * free. Console and shell are disabled in prj.conf: the CDC port carries
- * the protocol stream, and the boot banner is visible in the RTT debug
- * build (rtt.conf).
+ * free. Console and shell are disabled in prj.conf: the USB interface
+ * carries the protocol stream, and the boot banner is visible in the RTT
+ * debug build (rtt.conf).
  *
  * Signal generation timing: TIM8 update events at 100 kHz (10 us tick,
  * pin-partition plan); the update interrupt drives cas_step(), the fault
@@ -24,22 +24,7 @@
 
 / {
 	aliases {
-		fibre-uart = &cdc_acm_uart0;
-	};
-};
-
-/* Fibre transport: the USB CDC-ACM virtual serial port on the Type-C
- * connector (the board has no USB-UART bridge). The usbotg_fs UDC node is
- * already enabled in the board DTS; this adds the CDC serial instance.
- * FIFOs: Fibre frames are small, 4 KiB TX headroom is plenty under the
- * TIM8 signal-tick load. The USB device stack itself is enabled in
- * boards/fk407m2_zgt6.conf.
- */
-&zephyr_udc0 {
-	cdc_acm_uart0: cdc_acm_uart0 {
-		compatible = "zephyr,cdc-acm-uart";
-		tx-fifo-size = <4096>;
-		rx-fifo-size = <2048>;
+		fibre-usb = &zephyr_udc0;
 	};
 };
 

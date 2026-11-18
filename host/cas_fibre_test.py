@@ -2,9 +2,10 @@
 """
 Host-side verification for the cas-sim app (FK407M2-ZGT6).
 
-Connects to the device over its USB CDC-ACM virtual serial port (the Type-C
-connector; the board has no USB-UART bridge, so no adapter wiring is needed)
-and exercises the CasIntf Fibre interface end to end:
+Connects to the device over its native USB vendor bulk interface (the
+Type-C connector, via libusb; the board has no USB-UART bridge, so no
+adapter wiring is needed) and exercises the CasIntf Fibre interface end to
+end:
 
   1. fetch the interface JSON from endpoint 0 (offset based reads)
   2. read `firmware_version` (readonly, expect 0x00010000) and `tick_hz`
@@ -18,11 +19,16 @@ and exercises the CasIntf Fibre interface end to end:
   7. reject invalid arguments (channel out of range, unknown trigger)
 
 The protocol layer comes from the Fibre python package in the west module
-checkout (modules/lib/fibre/python/fibre/protocol.py); only the serial
+checkout (modules/lib/fibre/python/fibre/protocol.py); only the libusb
 stream adapter lives here.
 
-usage: cas_fibre_test.py <serial-port> [baudrate]
-       cas_fibre_test.py /dev/ttyACM0
+The device exposes one vendor-specific interface with the ODrive
+native-interface class codes (0xFF/0x01/0x01) and one bulk IN / bulk OUT
+endpoint pair; the Fibre protocol runs as a raw byte stream over them.
+
+usage: cas_fibre_test.py [vid:pid]
+       cas_fibre_test.py                # first matching device
+       cas_fibre_test.py 2fe3:0004      # filter by VID:PID
 """
 
 import json
@@ -37,9 +43,12 @@ FIBRE_PYTHON = os.path.normpath(os.path.join(
 sys.path.insert(0, FIBRE_PYTHON)
 
 try:
-    import serial
+    import usb.core
+    import usb.util
 except ImportError:
-    sys.exit("pyserial is required: pip install pyserial")
+    sys.exit("pyusb is required: pip install pyusb (libusb-1.0 must be "
+             "installed; on Linux add a udev rule or run as root for raw "
+             "USB access)")
 
 # The fibre package's __init__.py loads a prebuilt libfibre shared object at
 # import time (libfibre.py), which is neither present nor needed here: the
@@ -80,16 +89,57 @@ PACK = {
 }
 
 
-class SerialStreamSource(StreamSource):
-    """fibre.protocol StreamSource backed by a pyserial port."""
+# Vendor-interface class codes (ODrive native interface), matched by the
+# device discovery below.
+INTF_CLASS = 0xFF
+INTF_SUBCLASS = 0x01
+INTF_PROTOCOL = 0x01
 
-    def __init__(self, ser):
-        self._ser = ser
+
+def find_fibre_device(vid_pid=None):
+    """Returns the first USB device exposing a vendor interface with the
+    Fibre class codes, optionally filtered by (vid, pid)."""
+    def match(dev):
+        if vid_pid and (dev.idVendor, dev.idProduct) != vid_pid:
+            return False
+        for cfg in dev:
+            for intf in cfg:
+                if (intf.bInterfaceClass == INTF_CLASS and
+                        intf.bInterfaceSubClass == INTF_SUBCLASS and
+                        intf.bInterfaceProtocol == INTF_PROTOCOL):
+                    return True
+        return False
+
+    dev = usb.core.find(custom_match=match)
+    if dev is None:
+        raise RuntimeError(
+            "no USB device with a Fibre vendor interface "
+            f"(class {INTF_CLASS:#04x}/{INTF_SUBCLASS:#04x}/"
+            f"{INTF_PROTOCOL:#04x}) found"
+            + (f" for {vid_pid[0]:04x}:{vid_pid[1]:04x}" if vid_pid else ""))
+    return dev
+
+
+class UsbBulkStreamSource(StreamSource):
+    """fibre.protocol StreamSource backed by a libusb bulk IN endpoint."""
+
+    def __init__(self, dev, ep_addr):
+        self._dev = dev
+        self._ep = ep_addr
 
     def get_bytes(self, n_bytes, deadline):
         """Returns up to n_bytes, waiting at most until the deadline."""
-        self._ser.timeout = max(0.0, deadline - time.monotonic())
-        return self._ser.read(n_bytes)
+        data = bytearray()
+        while len(data) < n_bytes:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            chunk = self._dev.read(self._ep, n_bytes - len(data),
+                                   max(1, int(remaining * 1000)))
+            if not chunk:
+                break
+            data.extend(chunk)
+        return bytes(data)
 
     def get_bytes_or_fail(self, n_bytes, deadline):
         """Blocks until exactly n_bytes were received or the deadline is
@@ -99,22 +149,72 @@ class SerialStreamSource(StreamSource):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise FibreTimeout()
-            self._ser.timeout = remaining
-            chunk = self._ser.read(n_bytes - len(data))
+            chunk = self._dev.read(self._ep, n_bytes - len(data),
+                                   max(1, int(remaining * 1000)))
             if chunk:
                 data.extend(chunk)
         return bytes(data)
 
 
-class SerialStreamSink(StreamSink):
-    """fibre.protocol StreamSink backed by a pyserial port."""
+class UsbBulkStreamSink(StreamSink):
+    """fibre.protocol StreamSink backed by a libusb bulk OUT endpoint."""
 
-    def __init__(self, ser):
-        self._ser = ser
+    def __init__(self, dev, ep_addr, timeout_ms=1000):
+        self._dev = dev
+        self._ep = ep_addr
+        self._timeout_ms = timeout_ms
 
     def process_bytes(self, data):
-        self._ser.write(data)
-        self._ser.flush()
+        # libusb segments writes larger than the endpoint MPS automatically;
+        # the device also NAKs OUT packets while its Fibre stack is busy, so
+        # retry until the whole buffer was accepted.
+        data = bytes(data)
+        sent = 0
+        while sent < len(data):
+            sent += self._dev.write(self._ep, data[sent:], self._timeout_ms)
+
+
+def open_fibre_device(vid_pid=None):
+    """Finds the device, claims the Fibre vendor interface and returns
+    (dev, bulk_in_addr, bulk_out_addr)."""
+    dev = find_fibre_device(vid_pid)
+    dev.set_configuration()
+
+    cfg = dev.get_active_configuration()
+    intf = usb.util.find_descriptor(
+        cfg, custom_match=lambda i: (
+            i.bInterfaceClass == INTF_CLASS and
+            i.bInterfaceSubClass == INTF_SUBCLASS and
+            i.bInterfaceProtocol == INTF_PROTOCOL))
+    if intf is None:
+        raise RuntimeError("Fibre vendor interface not found in the active "
+                           "configuration")
+
+    ep_in = usb.util.find_descriptor(
+        intf, custom_match=lambda e:
+            usb.util.endpoint_direction(e.bEndpointAddress) ==
+            usb.util.ENDPOINT_IN)
+    ep_out = usb.util.find_descriptor(
+        intf, custom_match=lambda e:
+            usb.util.endpoint_direction(e.bEndpointAddress) ==
+            usb.util.ENDPOINT_OUT)
+    if ep_in is None or ep_out is None:
+        raise RuntimeError("bulk endpoints not found on the Fibre interface")
+
+    # pyusb claims the interface on first use; detach kernel drivers if one
+    # grabbed it (e.g. on setups where a generic driver binds the interface).
+    if dev.is_kernel_driver_active(intf.bInterfaceNumber):
+        dev.detach_kernel_driver(intf.bInterfaceNumber)
+
+    product = ""
+    try:
+        product = usb.util.get_string(dev, dev.iProduct)
+    except (usb.core.USBError, ValueError):
+        pass
+    print(f"Opened USB device {dev.idVendor:04x}:{dev.idProduct:04x} "
+          f"bus {dev.bus} address {dev.address}"
+          + (f" ({product})" if product else ""))
+    return dev, ep_in.bEndpointAddress, ep_out.bEndpointAddress
 
 
 def read_prop(channel, endpoint, size):
@@ -171,18 +271,20 @@ def check(name, condition, detail=""):
 
 
 def main():
-    if len(sys.argv) < 2:
-        sys.exit(f"usage: {sys.argv[0]} <serial-port> [baudrate]")
-    port = sys.argv[1]
-    baud = int(sys.argv[2]) if len(sys.argv) > 2 else 115200
+    vid_pid = None
+    if len(sys.argv) > 1:
+        try:
+            vid_s, pid_s = sys.argv[1].split(':')
+            vid_pid = (int(vid_s, 16), int(pid_s, 16))
+        except ValueError:
+            sys.exit(f"usage: {sys.argv[0]} [vid:pid]")
 
-    ser = serial.Serial(port, baud, timeout=1.0)
-    print(f"Opened {port} at {baud} baud")
+    dev, ep_in, ep_out = open_fibre_device(vid_pid)
 
     channel = Channel(
-        "cas-sim-uart",
-        PacketFromStreamConverter(SerialStreamSource(ser)),
-        StreamBasedPacketSink(SerialStreamSink(ser)),
+        "cas-sim-usb",
+        PacketFromStreamConverter(UsbBulkStreamSource(dev, ep_in)),
+        StreamBasedPacketSink(UsbBulkStreamSink(dev, ep_out)),
         Event(),  # cancellation token
         Logger(),
     )
@@ -277,7 +379,7 @@ def main():
     # -- stop the engine again ------------------------------------------------
     call_function(channel, find_endpoint(json_def, 'set_rpm'), 0)
 
-    ser.close()
+    usb.util.dispose_resources(dev)
 
     print()
     if ok:

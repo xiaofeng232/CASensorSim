@@ -11,11 +11,15 @@
  *      output stage CH00..CH07 = PE0..PE7 (dig[] levels with a single
  *      BSRR write; oe=0 switches the pin to input = high-Z, FR-30) and
  *      the telemetry mirror refresh (below).
- *   2. Fibre protocol on USART1 (PA9/PA10, `fibre-uart` alias): exposes
- *      the CasIntf interface (interface/cas_interface.yaml) -- readonly
- *      telemetry attributes + set_rpm / set_dig_fault / set_ssi_fault /
- *      clear_faults. The Fibre stack runs in its own event-loop thread;
- *      protocol calls never run in ISR context.
+ *   2. Fibre protocol over the native USB bulk interface (`fibre-usb`
+ *      alias; on boards without a usable device controller, over the UART
+ *      selected by `fibre-uart`): exposes the CasIntf interface
+ *      (interface/cas_interface.yaml) -- readonly telemetry attributes +
+ *      set_rpm / set_dig_fault / set_ssi_fault / clear_faults. The Fibre
+ *      stack runs in its own event-loop thread; protocol calls never run
+ *      in ISR context. The transport backend comes from the platform
+ *      fibre-transport module; the build picks USB or UART depending on
+ *      which alias the board overlay defines.
  *
  * Concurrency model:
  *   - The ISR writes the CasObject telemetry members every tick (plain
@@ -30,9 +34,9 @@
  * SSI: both absolute-angle words are computed every tick; their pin
  * layer (PA8/PC0 + RS-485 DIR, TIM6 protocol timing) is a later step.
  *
- * Console and shell are disabled (USART1 is Fibre-exclusive); build with
- * `-DEXTRA_CONF_FILE=rtt.conf` for logs over SEGGER RTT (SWD). The
- * host-side counterpart is host/cas_fibre_test.py.
+ * Console and shell are disabled (the Fibre transport owns the protocol
+ * interface); build with `-DEXTRA_CONF_FILE=rtt.conf` for logs over SEGGER
+ * RTT (SWD). The host-side counterpart is host/cas_fibre_test.py.
  */
 
 #include <cmath>
@@ -48,7 +52,12 @@
 
 #include "app_version.h"
 #include "banner.h"
-#include "uart_backend.hpp"
+
+#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
+#include <fibre_transport/usb_backend.hpp>
+#else
+#include <fibre_transport/uart_backend.hpp>
+#endif
 #include "interfaces.hpp"
 
 #include "cas_core.h"
@@ -193,7 +202,20 @@ const uint8_t kNodeId[16] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 };
 
-cas_sim::UartBackend uart_backend_;
+/* Consistency between the devicetree alias and the enabled fibre-transport
+ * backend: exactly one of the two transports must be wired up. */
+#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb)) && !defined(CONFIG_FIBRE_TRANSPORT_USB)
+#error "fibre-usb devicetree alias present but CONFIG_FIBRE_TRANSPORT_USB is not enabled"
+#endif
+#if !DT_NODE_EXISTS(DT_ALIAS(fibre_usb)) && !defined(CONFIG_FIBRE_TRANSPORT_UART)
+#error "no fibre-usb alias; enable CONFIG_FIBRE_TRANSPORT_UART and define a fibre-uart alias"
+#endif
+
+#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
+fibre_transport::UsbBackend transport_backend_;
+#else
+fibre_transport::UartBackend transport_backend_;
+#endif
 fibre::ZephyrEventLoop event_loop_;
 
 /* --------------------------------------------------------------------------
@@ -359,7 +381,23 @@ struct OnStarted {
 			return;
 		}
 
-		if (ctx->init_backend("uart", &uart_backend_).is_error()) {
+#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
+		if (ctx->init_backend("usb", &transport_backend_).is_error()) {
+			LOG_ERR("failed to initialize USB backend");
+			return;
+		}
+
+		/* Domain path "<transport>:<specs>": the USB backend ignores
+		 * the specs part (single fixed interface). */
+		fibre::Domain *domain = ctx->create_domain("usb:", kNodeId, {});
+		if (!domain) {
+			LOG_ERR("failed to create Fibre domain");
+			return;
+		}
+
+		LOG_INF("fibre: domain ready, serving cas_object over USB bulk");
+#else
+		if (ctx->init_backend("uart", &transport_backend_).is_error()) {
 			LOG_ERR("failed to initialize UART backend");
 			return;
 		}
@@ -372,7 +410,8 @@ struct OnStarted {
 			return;
 		}
 
-		LOG_INF("fibre: domain ready, serving cas_object over USART1");
+		LOG_INF("fibre: domain ready, serving cas_object over UART");
+#endif
 	}
 };
 
