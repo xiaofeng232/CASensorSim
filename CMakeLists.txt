@@ -32,6 +32,13 @@ git_version_init(${CMAKE_CURRENT_LIST_DIR})
 include(${CMAKE_CURRENT_LIST_DIR}/../../scripts/platform_version.cmake)
 platform_version_init(${CMAKE_CURRENT_LIST_DIR})
 
+# Platform banner module only (lib/util/banner as its own Zephyr module): it
+# provides the boot banner and the banner_logo() hook without pulling in the
+# rest of the platform lib module, whose MFCS runtime services would leak
+# into this app (e.g. NETCFG defaults to y under NETWORKING).
+list(APPEND EXTRA_ZEPHYR_MODULES
+     ${CMAKE_CURRENT_LIST_DIR}/../../lib/util/banner)
+
 # Out-of-tree board root (boards/others/fk407m2_zgt6).
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 
@@ -94,6 +101,7 @@ add_custom_command(
 
 target_sources(app PRIVATE
     src/main.cpp
+    src/logo.cpp
     src/uart_backend.cpp
     ${AUTOGEN_DIR}/endpoints.cpp
     ${AUTOGEN_DIR}/static_exports.cpp

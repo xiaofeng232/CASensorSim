@@ -47,6 +47,7 @@
 #include <fibre/zephyr_event_loop.hpp>
 
 #include "app_version.h"
+#include "banner.h"
 #include "uart_backend.hpp"
 #include "interfaces.hpp"
 
@@ -386,6 +387,8 @@ CasIntfIntf *cas_object_ptr = &cas_object_wrapper_;
 
 int main(void)
 {
+	banner_print();
+
 	if (!gpio_is_ready_dt(&led)) {
 		LOG_ERR("LED device not ready");
 		return -ENODEV;
