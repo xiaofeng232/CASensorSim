@@ -8,7 +8,7 @@
  * no USB-UART bridge, so the native USB device controller is used directly
  * (host side: libusb; the interface carries the Fibre protocol as a raw
  * byte stream). The `fibre-usb` alias below selects the UDC controller for
- * the platform fibre-transport module, which builds the USBD context and
+ * the platform fibre-transport service, which builds the USBD context and
  * the vendor interface (class codes 0xFF/0x01/0x01) on top of it.
  *
  * USART1 is not used by this app and is disabled below, so PA9/PA10 stay

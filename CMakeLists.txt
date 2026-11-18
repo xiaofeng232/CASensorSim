@@ -34,14 +34,12 @@ git_version_init(${CMAKE_CURRENT_LIST_DIR})
 include(${CMAKE_CURRENT_LIST_DIR}/../../scripts/platform_version.cmake)
 platform_version_init(${CMAKE_CURRENT_LIST_DIR})
 
-# Platform modules: the boot banner (lib/util/banner) and the Fibre
-# transport backends (lib/services/fibre-transport). Both are registered as
-# their own Zephyr modules so the rest of the platform lib (whose MFCS
-# runtime services leak into unrelated applications, e.g. NETCFG defaults
-# to y under NETWORKING) is not pulled in.
+# Platform lib module: provides the boot banner (util/banner), the Fibre
+# transport backends (services/fibre-transport) and the rest of the platform
+# services -- all of those default to n, so only what prj.conf enables
+# (CONFIG_BANNER*, CONFIG_FIBRE_TRANSPORT*) compiles in.
 list(APPEND EXTRA_ZEPHYR_MODULES
-     ${CMAKE_CURRENT_LIST_DIR}/../../lib/util/banner
-     ${CMAKE_CURRENT_LIST_DIR}/../../lib/services/fibre-transport)
+     ${CMAKE_CURRENT_LIST_DIR}/../../lib)
 
 # Out-of-tree board root (boards/others/fk407m2_zgt6).
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)

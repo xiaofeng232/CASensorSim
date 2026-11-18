@@ -18,7 +18,7 @@
  *      set_rpm / set_dig_fault / set_ssi_fault / clear_faults. The Fibre
  *      stack runs in its own event-loop thread; protocol calls never run
  *      in ISR context. The transport backend comes from the platform
- *      fibre-transport module; the build picks USB or UART depending on
+ *      fibre-transport service; the build picks USB or UART depending on
  *      which alias the board overlay defines.
  *
  * Concurrency model:
@@ -54,9 +54,9 @@
 #include "banner.h"
 
 #if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
-#include <fibre_transport/usb_backend.hpp>
+#include <usb_backend.hpp>
 #else
-#include <fibre_transport/uart_backend.hpp>
+#include <uart_backend.hpp>
 #endif
 #include "interfaces.hpp"
 
