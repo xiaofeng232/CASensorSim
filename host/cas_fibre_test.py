@@ -2,9 +2,9 @@
 """
 Host-side verification for the cas-sim app (FK407M2-ZGT6).
 
-Connects to the device over a plain serial port (USB-UART adapter wired to
-the board header: device TX PA9 -> adapter RX, device RX PA10 <- adapter TX,
-GND common, 115200 8N1) and exercises the CasIntf Fibre interface end to end:
+Connects to the device over its USB CDC-ACM virtual serial port (the Type-C
+connector; the board has no USB-UART bridge, so no adapter wiring is needed)
+and exercises the CasIntf Fibre interface end to end:
 
   1. fetch the interface JSON from endpoint 0 (offset based reads)
   2. read `firmware_version` (readonly, expect 0x00010000) and `tick_hz`
@@ -22,7 +22,7 @@ checkout (modules/lib/fibre/python/fibre/protocol.py); only the serial
 stream adapter lives here.
 
 usage: cas_fibre_test.py <serial-port> [baudrate]
-       cas_fibre_test.py /dev/ttyUSB0
+       cas_fibre_test.py /dev/ttyACM0
 """
 
 import json

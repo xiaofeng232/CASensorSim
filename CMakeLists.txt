@@ -6,8 +6,9 @@
 # bit-exact cas_core / cas_fault port of the casim golden model lives in
 # cas/ (include/ + src/, plain library, host-testable with test/). The app
 # layer (src/main.cpp) runs the 100 kHz TIM8 signal path and publishes the
-# CasIntf telemetry/parameter interface over Fibre on USART1; the interface
-# autogen code is generated at build time from interface/cas_interface.yaml
+# CasIntf telemetry/parameter interface over Fibre on the USB CDC-ACM
+# virtual serial port (Type-C connector); the interface autogen code is
+# generated at build time from interface/cas_interface.yaml
 # with the generator shipped in the Fibre module -- nothing generated is
 # committed.
 #
