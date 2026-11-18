@@ -19,7 +19,7 @@ out-of-tree，CMakeLists 已把工作区根加入 BOARD_ROOT）：
 west build -p always -b fk407m2_zgt6 apps/cas-sim
 west flash -d apps/cas-sim/build
 
-# 调试变体：日志走 SEGGER RTT（SWD），USART1 保持 fibre 独占
+# 调试变体：日志走 SEGGER RTT（SWD），USB bulk 接口保持 fibre 独占
 west build -p always -b fk407m2_zgt6 apps/cas-sim -d apps/cas-sim/build-rtt \
     -- -DEXTRA_CONF_FILE=rtt.conf
 ```
@@ -34,14 +34,12 @@ cas/                     虚拟 CA 引擎库（平台无关，host 直接编译�
 └── CMakeLists.txt       源码并入 app 镜像（add_subdirectory 挂载）
 src/                     app 层（C++）
 ├── main.cpp             TIM8 10 µs tick 信号路径 + Fibre 对象（CasObject）
-├── uart_backend.{hpp,cpp}  Fibre UART 传输后端（fibre-uart alias）
 └── fibre_libc_fix.h     fibre 模块 -include 重定向（补 ssize_t）
 interface/               cas_interface.yaml —— CasIntf 接口定义（唯一事实源）；
                          interfaces.hpp/endpoints.cpp/static_exports.cpp 构建期
                          由 modules/lib/fibre 的生成器产出，不入库
-host/                    cas_fibre_test.py —— 上位机串口验证脚本
-boards/                  每板 overlay：fk407m2_zgt6（fibre-uart=usart1 + TIM8）、
-                         nucleo_f429zi（fibre-uart=usart3，保留可构建）
+host/                    cas_fibre_test.py —— 上位机 USB bulk 验证脚本（libusb）
+boards/                  fk407m2_zgt6 overlay + conf（fibre-usb=zephyr_udc0 + TIM8）
 test/                    主机黄金测试（纯 C11，不依赖 Zephyr：make -C test test）
 rtt.conf                 SEGGER RTT 日志变体（-DEXTRA_CONF_FILE=rtt.conf）
 ```
@@ -59,9 +57,10 @@ rtt.conf                 SEGGER RTT 日志变体（-DEXTRA_CONF_FILE=rtt.conf）
   （PA8/PC0 + RS-485 DIR、TIM6 协议时序）为后续步骤。
 - **故障注入**：上电全关（FR-34）；触发条件 立即/作用角/每 n 转/每 n 帧（FR-33）。
 
-## 参数/遥测接口（Fibre over USART1）
+## 参数/遥测接口（Fibre over USB bulk）
 
-USART1（PA9/PA10，115200 8N1）专用于 [Fibre](https://github.com/xiaofeng232/fibre)
+原生 USB bulk 接口（Type-C 连接器，vendor 接口类别码 0xFF/0x01/0x01，上位机经
+libusb 直连）专用于 [Fibre](https://github.com/xiaofeng232/fibre)
 协议：console/shell 全部关闭，日志走 RTT 变体。接口 `CasIntf`
 （`interface/cas_interface.yaml`，构建期代码生成）：
 
@@ -90,11 +89,11 @@ legacy fibre01 端点协议的函数载荷只支持定长 int/uint——bool 用
 可能撕裂，单调计数可接受）；参数写入在 fibre event-loop 线程用 `irq_lock()`
 保护，ISR 不会看到半更新的 profile/故障集。
 
-上位机验证（USB-UART 适配器接 PA9/PA10）：
+上位机验证（Type-C 直连，无需适配器；按 vendor 接口类别码自动发现设备）：
 
 ```sh
-pip install pyserial
-python3 host/cas_fibre_test.py /dev/ttyUSB0        # 全部检查项
+pip install pyusb
+python3 host/cas_fibre_test.py [vid:pid]           # 全部检查项
 ```
 
 ## 状态
@@ -105,7 +104,7 @@ python3 host/cas_fibre_test.py /dev/ttyUSB0        # 全部检查项
 - [x] `cas_fault` 故障注入（FR-30/31/33/34，HANDOFF.md §7.4；故障向量全过，
       全关时与无故障基线位级一致；缺齿 FR-32 二期）
 - [x] 定时器驱动 `cas_step()` + 数字通道 GPIO 输出（TIM8 @ 10 µs，PE0..PE7）
-- [x] 参数/遥测接口：Fibre over USART1（CasIntf；转速/故障在线下发 +
+- [x] 参数/遥测接口：Fibre over USB bulk（CasIntf；转速/故障在线下发 +
       遥测镜像；`host/cas_fibre_test.py` 上位机验证）
 - [ ] SSI 引脚输出（PA8/PC0 + DIR，TIM6 协议时序）
 - [ ] 预置/几何参数在线下发（cfg 级 cas_init 重建；当前仅转速+故障在线）

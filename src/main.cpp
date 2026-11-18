@@ -12,14 +12,12 @@
  *      BSRR write; oe=0 switches the pin to input = high-Z, FR-30) and
  *      the telemetry mirror refresh (below).
  *   2. Fibre protocol over the native USB bulk interface (`fibre-usb`
- *      alias; on boards without a usable device controller, over the UART
- *      selected by `fibre-uart`): exposes the CasIntf interface
+ *      alias): exposes the CasIntf interface
  *      (interface/cas_interface.yaml) -- readonly telemetry attributes +
  *      set_rpm / set_dig_fault / set_ssi_fault / clear_faults. The Fibre
  *      stack runs in its own event-loop thread; protocol calls never run
- *      in ISR context. The transport backend comes from the platform
- *      fibre-transport service; the build picks USB or UART depending on
- *      which alias the board overlay defines.
+ *      in ISR context. The transport backend (fibre_transport::UsbBackend)
+ *      comes from the platform lib/services/fibre-transport service.
  *
  * Concurrency model:
  *   - The ISR writes the CasObject telemetry members every tick (plain
@@ -53,11 +51,7 @@
 #include "app_version.h"
 #include "banner.h"
 
-#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
 #include <usb_backend.hpp>
-#else
-#include <uart_backend.hpp>
-#endif
 #include "interfaces.hpp"
 
 #include "cas_core.h"
@@ -203,19 +197,12 @@ const uint8_t kNodeId[16] = {
 };
 
 /* Consistency between the devicetree alias and the enabled fibre-transport
- * backend: exactly one of the two transports must be wired up. */
+ * backend. */
 #if DT_NODE_EXISTS(DT_ALIAS(fibre_usb)) && !defined(CONFIG_FIBRE_TRANSPORT_USB)
 #error "fibre-usb devicetree alias present but CONFIG_FIBRE_TRANSPORT_USB is not enabled"
 #endif
-#if !DT_NODE_EXISTS(DT_ALIAS(fibre_usb)) && !defined(CONFIG_FIBRE_TRANSPORT_UART)
-#error "no fibre-usb alias; enable CONFIG_FIBRE_TRANSPORT_UART and define a fibre-uart alias"
-#endif
 
-#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
 fibre_transport::UsbBackend transport_backend_;
-#else
-fibre_transport::UartBackend transport_backend_;
-#endif
 fibre::ZephyrEventLoop event_loop_;
 
 /* --------------------------------------------------------------------------
@@ -381,7 +368,6 @@ struct OnStarted {
 			return;
 		}
 
-#if DT_NODE_EXISTS(DT_ALIAS(fibre_usb))
 		if (ctx->init_backend("usb", &transport_backend_).is_error()) {
 			LOG_ERR("failed to initialize USB backend");
 			return;
@@ -396,22 +382,6 @@ struct OnStarted {
 		}
 
 		LOG_INF("fibre: domain ready, serving cas_object over USB bulk");
-#else
-		if (ctx->init_backend("uart", &transport_backend_).is_error()) {
-			LOG_ERR("failed to initialize UART backend");
-			return;
-		}
-
-		/* Domain path "<transport>:<specs>": the UART backend ignores
-		 * the specs part (single fixed port). */
-		fibre::Domain *domain = ctx->create_domain("uart:", kNodeId, {});
-		if (!domain) {
-			LOG_ERR("failed to create Fibre domain");
-			return;
-		}
-
-		LOG_INF("fibre: domain ready, serving cas_object over UART");
-#endif
 	}
 };
 
