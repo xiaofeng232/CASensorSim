@@ -22,6 +22,16 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
+# Version machinery (odrive_study model, doc/design/mfcs-007.md): the app
+# line derives from this repo's git tags (+ version.txt target), the
+# platform line from the workspace repo, checked against
+# platform-requires.txt at configure time. The init calls must run before
+# find_package(Zephyr) so the generated version.conf reaches kconfig.
+include(${CMAKE_CURRENT_LIST_DIR}/../../scripts/git_version.cmake)
+git_version_init(${CMAKE_CURRENT_LIST_DIR})
+include(${CMAKE_CURRENT_LIST_DIR}/../../scripts/platform_version.cmake)
+platform_version_init(${CMAKE_CURRENT_LIST_DIR})
+
 # Out-of-tree board root (boards/others/fk407m2_zgt6).
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 
@@ -124,3 +134,10 @@ unset(_fibre_libs)
 unset(_fibre_lib)
 unset(_fibre_opts)
 unset(_fibre_stdint_idx)
+
+# Add APP_VERSION_* / PLATFORM_VERSION_* compile definitions once the app
+# target exists, and generate the version description headers that firmware
+# code includes ("app_version.h" / "platform_version.h").
+git_version_finalize()
+platform_version_finalize()
+version_header_generate(${CMAKE_CURRENT_BINARY_DIR}/generated)

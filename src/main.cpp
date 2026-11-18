@@ -46,6 +46,7 @@
 #include <fibre/fibre.hpp>
 #include <fibre/zephyr_event_loop.hpp>
 
+#include "app_version.h"
 #include "uart_backend.hpp"
 #include "interfaces.hpp"
 
@@ -67,8 +68,14 @@ constexpr uint32_t CAS_TICK_HZ = 100000u;
 /* CH00..CH07 sit on PE0..PE7. */
 constexpr uint32_t CAS_DIG_MASK = 0xFFu;
 
-/* Firmware version reported over Fibre (v1.0.0). */
-constexpr uint32_t CASIM_FW_VERSION = 0x00010000u;
+/* Firmware version reported over Fibre, encoded (major<<16)|(minor<<8)|patch.
+ * Derived at build time from this repo's git state (the generated
+ * app_version.h; see CMakeLists.txt) instead of a hardcoded constant: it
+ * follows the vX.Y.Z tag / version.txt target of the CASensorSim repo. */
+constexpr uint32_t CASIM_FW_VERSION =
+    (static_cast<uint32_t>(APP_VERSION_MAJOR) << 16) |
+    (static_cast<uint32_t>(APP_VERSION_MINOR) << 8) |
+    static_cast<uint32_t>(APP_VERSION_PATCH);
 
 /* --------------------------------------------------------------------------
  * Engine + output stage state (ISR context)
