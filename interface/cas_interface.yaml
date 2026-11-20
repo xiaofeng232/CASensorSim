@@ -3,10 +3,11 @@ ns:       cas
 summary:  CASensorSim telemetry and parameter interface
 
 # Interface published by the cas-sim firmware over the Fibre protocol
-# (USART1 on the FK407M2-ZGT6, see src/uart_backend.cpp). The host-side
-# verification script is host/cas_fibre_test.py; it reads the interface
-# JSON from endpoint 0, resolves these endpoints and exercises them over
-# the serial link.
+# (native USB bulk interface on the Type-C connector, alias `fibre-usb`;
+# the board has no USB-UART bridge). The host-side verification script is
+# host/cas_fibre_test.py; it reads the interface JSON from endpoint 0,
+# resolves these endpoints and exercises them over the libusb bulk
+# endpoints.
 #
 # Telemetry attributes are refreshed by the 100 kHz signal ISR every tick
 # (see src/main.cpp). 32-bit aligned reads are atomic on Cortex-M; the
