@@ -1,5 +1,5 @@
 # Platform (zephyrproject) version this application requires.
 # One SemVer range line; BUILD is ignored (compatibility is the API version).
 # Enforced at CMake configure time (scripts/platform_version.cmake).
-# See doc/design/mfcs-007.md.
+# See doc/guideline/version.md.
 >=1.3.2 <2.0.0

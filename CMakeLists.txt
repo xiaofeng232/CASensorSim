@@ -23,7 +23,7 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-# Version machinery (odrive_study model, doc/design/mfcs-007.md): the app
+# Version machinery (odrive_study model, see doc/guideline/version.md): the app
 # line derives from this repo's git tags (+ version.txt target), the
 # platform line from the workspace repo, checked against
 # platform-requires.txt at configure time. The init calls must run before
